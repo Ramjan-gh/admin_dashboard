@@ -34,6 +34,12 @@ type Sport = {
 export function DashboardHome() {
   const today = new Date();
 
+  const selectClass =
+    "h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 shadow-sm " +
+    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
+    "hover:border-gray-400 transition";
+
+
   // ---------------- STATES ----------------
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -213,50 +219,72 @@ export function DashboardHome() {
                 breakdownType === t ? "bg-blue-500 text-white" : "bg-gray-200"
               }`}
             >
-              {t}
+              {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-4 rounded-xl border">
+        {/* DAILY */}
         {breakdownType === "daily" && (
           <>
             <select
+              className={selectClass}
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(+e.target.value)}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className={selectClass}
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(+e.target.value)}
+            >
+              {monthNames.map((m, i) => (
+                <option key={i} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className={selectClass}
               value={selectedDay}
               onChange={(e) => setSelectedDay(+e.target.value)}
             >
               {days.map((d) => (
-                <option key={d}>{d}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(+e.target.value)}
-            >
-              {monthNames.map((m, i) => (
-                <option key={i} value={i + 1}>
-                  {m}
+                <option key={d} value={d}>
+                  {d}
                 </option>
-              ))}
-            </select>
-
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(+e.target.value)}
-            >
-              {years.map((y) => (
-                <option key={y}>{y}</option>
               ))}
             </select>
           </>
         )}
 
+        {/* MONTHLY */}
         {breakdownType === "monthly" && (
           <>
             <select
+              className={selectClass}
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(+e.target.value)}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className={selectClass}
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(+e.target.value)}
             >
@@ -266,25 +294,20 @@ export function DashboardHome() {
                 </option>
               ))}
             </select>
-
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(+e.target.value)}
-            >
-              {years.map((y) => (
-                <option key={y}>{y}</option>
-              ))}
-            </select>
           </>
         )}
 
+        {/* YEARLY */}
         {breakdownType === "yearly" && (
           <select
+            className={selectClass}
             value={selectedYear}
             onChange={(e) => setSelectedYear(+e.target.value)}
           >
             {years.map((y) => (
-              <option key={y}>{y}</option>
+              <option key={y} value={y}>
+                {y}
+              </option>
             ))}
           </select>
         )}
