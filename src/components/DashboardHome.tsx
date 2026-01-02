@@ -8,6 +8,9 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
@@ -20,11 +23,18 @@ type Stat = {
   gradient: string;
 };
 
+type Sport = {
+  name: string;
+  value: number;
+  color: string;
+};
+
 export function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stat[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [sportsData, setSportsData] = useState<Sport[]>([]);
   const [breakdownType, setBreakdownType] = useState<"daily" | "monthly">(
     "daily"
   );
@@ -39,8 +49,18 @@ export function DashboardHome() {
     .split("T")[0];
 
   const monthNames = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   const currentMonthName = monthNames[new Date().getMonth()];
@@ -58,7 +78,9 @@ export function DashboardHome() {
         method: "POST",
         headers: {
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+          Authorization: `Bearer ${
+            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+          }`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -95,6 +117,7 @@ export function DashboardHome() {
           },
         ]);
         setRevenueData([]);
+        setSportsData([]);
         return;
       }
 
@@ -151,6 +174,39 @@ export function DashboardHome() {
         }))
       );
 
+      // ✅ Populate sportsData dynamically
+      // Generate colors dynamically or use predefined colors
+      const colors = ["#f87171", "#60a5fa", "#34d399", "#fbbf24", "#a78bfa"];
+      const sportsMap: Record<string, Sport> = {};
+
+      data.forEach((item, index) => {
+        if (!sportsMap[item.field_name]) {
+          sportsMap[item.field_name] = {
+            name: item.field_name,
+            value: item.total_revenue || 0,
+            color: colors[index % colors.length],
+          };
+        } else {
+          // if multiple entries, sum the revenue
+          sportsMap[item.field_name].value += item.total_revenue || 0;
+        }
+      });
+
+      // Sort by revenue descending
+      const sortedSports = Object.values(sportsMap).sort(
+        (a, b) => b.value - a.value
+      );
+
+      // Convert revenue to percentage of total for pie chart
+      const totalRevenueSum = sortedSports.reduce((sum, s) => sum + s.value, 0);
+      const sportsPercentage = sortedSports.map((s) => ({
+        ...s,
+        value: totalRevenueSum
+          ? Math.round((s.value / totalRevenueSum) * 100)
+          : 0,
+      }));
+
+      setSportsData(sportsPercentage);
     } catch (err) {
       console.error(err);
       setError("Failed to load dashboard data");
@@ -165,10 +221,7 @@ export function DashboardHome() {
       if (breakdownType === "daily") {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       }
-
-      return (
-        monthNames.indexOf(a.label) - monthNames.indexOf(b.label)
-      );
+      return monthNames.indexOf(a.label) - monthNames.indexOf(b.label);
     });
   }, [revenueData, breakdownType]);
 
@@ -219,7 +272,9 @@ export function DashboardHome() {
           return (
             <div key={i} className="bg-white border rounded-xl p-6 shadow-sm">
               <div className="flex justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-gradient-to-br ${stat.gradient}`}>
+                <div
+                  className={`p-3 rounded-lg bg-gradient-to-br ${stat.gradient}`}
+                >
                   <Icon className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-sm text-green-600">{stat.change}</span>
@@ -231,40 +286,82 @@ export function DashboardHome() {
         })}
       </div>
 
-      {/* Chart */}
-      <div className="bg-white border rounded-xl p-6 shadow-sm">
-        <div className="flex justify-between mb-4">
-          <div>
-            <h3 className="font-medium">Revenue Trend</h3>
-            <p className="text-sm text-gray-500">
-              {breakdownType === "daily"
-                ? `This Month (${currentMonthName})`
-                : "This Year"}
-            </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Revenue Chart */}
+        <div className="lg:col-span-2 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <div className="flex justify-between mb-4">
+            <div>
+              <h3 className="font-medium">Revenue Trend</h3>
+              <p className="text-sm text-gray-500">
+                {breakdownType === "daily"
+                  ? `This Month (${currentMonthName})`
+                  : "This Year"}
+              </p>
+            </div>
+            <TrendingUp className="w-5 h-5 text-green-500" />
           </div>
-          <TrendingUp className="w-5 h-5 text-green-500" />
+
+          <ResponsiveContainer width="100%" height={250}>
+            <AreaChart data={sortedRevenueData}>
+              <defs>
+                <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" />
+              <YAxis />
+              <Tooltip />
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke="#8b5cf6"
+                fill="url(#colorAmount)"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
 
-        <ResponsiveContainer width="100%" height={250}>
-          <AreaChart data={sortedRevenueData}>
-            <defs>
-              <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="label" />
-            <YAxis />
-            <Tooltip />
-            <Area
-              type="monotone"
-              dataKey="amount"
-              stroke="#8b5cf6"
-              fill="url(#colorAmount)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        {/* Sports Distribution */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <h3 className="text-gray-900 mb-6">Popular Sports</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie
+                data={sportsData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={80}
+                paddingAngle={5}
+                dataKey="value"
+              >
+                {sportsData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="mt-4 space-y-2">
+            {sportsData.map((sport, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: sport.color }}
+                  />
+                  <span className="text-gray-700">{sport.name}</span>
+                </div>
+                <span className="text-gray-900">{sport.value}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
