@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrendingUp, Calendar, DollarSign } from "lucide-react";
+import { TrendingUp, Calendar, DollarSign, ChevronDown } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -14,8 +14,6 @@ import {
 } from "recharts";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
-
-type Breakdown = "daily" | "monthly" | "yearly";
 
 type Stat = {
   label: string;
@@ -34,20 +32,21 @@ type Sport = {
 export function DashboardHome() {
   const today = new Date();
 
-  const selectClass =
-    "h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 shadow-sm " +
-    "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
-    "hover:border-gray-400 transition";
-
-
   // ---------------- STATES ----------------
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [breakdownType, setBreakdownType] = useState<Breakdown>("daily");
+  const [viewMode, setViewMode] = useState<"day" | "month" | "year">("day");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const [selectedDay, setSelectedDay] = useState(today.getDate());
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [selectedDate, setSelectedDate] = useState(
+    today.toISOString().split("T")[0]
+  ); // YYYY-MM-DD
+  const [selectedMonth, setSelectedMonth] = useState(
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
+  ); // YYYY-MM
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
 
   const [stats, setStats] = useState<Stat[]>([]);
@@ -55,30 +54,13 @@ export function DashboardHome() {
   const [sportsData, setSportsData] = useState<Sport[]>([]);
 
   // ---------------- HELPERS ----------------
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
+  const getDateLabel = () => {
+    if (viewMode === "day") return selectedDate;
+    if (viewMode === "month") return selectedMonth;
+    return selectedYear.toString();
+  };
 
   const years = Array.from({ length: 5 }, (_, i) => today.getFullYear() - i);
-
-  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-  // ---------------- EFFECT ----------------
-  useEffect(() => {
-    fetchOverview();
-  }, [breakdownType, selectedDay, selectedMonth, selectedYear]);
 
   // ---------------- API ----------------
   const fetchOverview = async () => {
@@ -88,18 +70,20 @@ export function DashboardHome() {
 
       const params = new URLSearchParams();
 
-      if (breakdownType === "daily") {
-        params.append("target_day", selectedDay.toString());
-        params.append("target_month", selectedMonth.toString());
-        params.append("target_year", selectedYear.toString());
+      if (viewMode === "day") {
+        const d = new Date(selectedDate);
+        params.append("target_day", d.getDate().toString());
+        params.append("target_month", (d.getMonth() + 1).toString());
+        params.append("target_year", d.getFullYear().toString());
       }
 
-      if (breakdownType === "monthly") {
-        params.append("target_month", selectedMonth.toString());
-        params.append("target_year", selectedYear.toString());
+      if (viewMode === "month") {
+        const [year, month] = selectedMonth.split("-").map(Number);
+        params.append("target_month", month.toString());
+        params.append("target_year", year.toString());
       }
 
-      if (breakdownType === "yearly") {
+      if (viewMode === "year") {
         params.append("target_year", selectedYear.toString());
       }
 
@@ -193,6 +177,10 @@ export function DashboardHome() {
     }
   };
 
+  useEffect(() => {
+    fetchOverview();
+  }, [viewMode, selectedDate, selectedMonth, selectedYear]);
+
   // ---------------- SORT ----------------
   const sortedRevenueData = useMemo(() => {
     return [...revenueData].sort(
@@ -206,111 +194,124 @@ export function DashboardHome() {
   // ---------------- UI ----------------
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-semibold">Dashboard Overview</h1>
-
-        <div className="flex gap-2">
-          {["daily", "monthly", "yearly"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setBreakdownType(t as Breakdown)}
-              className={`px-3 py-1 rounded capitalize ${
-                breakdownType === t ? "bg-blue-500 text-white" : "bg-gray-200"
-              }`}
-            >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
+      {/* Header with Date Filter */}
+      <div className="flex flex-col justify-between lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 className="text-gray-900 mb-1 text-xl font-semibold">
+            Dashboard Overview
+          </h1>
+          <p className="text-gray-500">
+            Welcome back! Here's what's happening.
+          </p>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center bg-gray-50 p-4 rounded-xl border">
-        {/* DAILY */}
-        {breakdownType === "daily" && (
-          <>
-            <select
-              className={selectClass}
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(+e.target.value)}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+        {/* Date Filter Controls */}
+        <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-3 mb-1">
+            {/* View Mode Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white min-w-[140px] justify-between"
+              >
+                <span className="text-gray-700">
+                  {viewMode === "day" && "Daily View"}
+                  {viewMode === "month" && "Monthly View"}
+                  {viewMode === "year" && "Yearly View"}
+                </span>
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              </button>
 
-            <select
-              className={selectClass}
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(+e.target.value)}
-            >
-              {monthNames.map((m, i) => (
-                <option key={i} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </select>
+              {dropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                  <button
+                    onClick={() => {
+                      setViewMode("day");
+                      setDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 rounded-t-lg"
+                  >
+                    Daily View
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode("month");
+                      setDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700"
+                  >
+                    Monthly View
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode("year");
+                      setDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 rounded-b-lg"
+                  >
+                    Yearly View
+                  </button>
+                </div>
+              )}
+            </div>
 
-            <select
-              className={selectClass}
-              value={selectedDay}
-              onChange={(e) => setSelectedDay(+e.target.value)}
-            >
-              {days.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
+            {/* Date/Month/Year Picker */}
+            {viewMode === "day" && (
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            )}
 
-        {/* MONTHLY */}
-        {breakdownType === "monthly" && (
-          <>
-            <select
-              className={selectClass}
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(+e.target.value)}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            {viewMode === "month" && (
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            )}
 
-            <select
-              className={selectClass}
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(+e.target.value)}
-            >
-              {monthNames.map((m, i) => (
-                <option key={i} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          </>
-        )}
+            {viewMode === "year" && (
+              <div className="relative">
+                <button
+                  onClick={() => setYearDropdownOpen(!yearDropdownOpen)}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white min-w-[140px] justify-between"
+                >
+                  <span className="text-gray-700">{selectedYear}</span>
+                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                </button>
 
-        {/* YEARLY */}
-        {breakdownType === "yearly" && (
-          <select
-            className={selectClass}
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(+e.target.value)}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        )}
+                {yearDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                    {years.map((y, idx) => (
+                      <button
+                        key={y}
+                        onClick={() => {
+                          setSelectedYear(y);
+                          setYearDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors text-gray-700 ${
+                          idx === 0 ? "rounded-t-lg" : ""
+                        } ${idx === years.length - 1 ? "rounded-b-lg" : ""}`}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Selected Date Display */}
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-sm text-gray-500">Viewing data for:</p>
+            <p className="text-gray-900">{getDateLabel()}</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats */}
