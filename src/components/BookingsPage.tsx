@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Filter, Plus, Eye, X } from "lucide-react";
+import { Search, Filter, Plus, Eye, X, ChevronDown } from "lucide-react";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
@@ -50,9 +50,17 @@ export function BookingsPage() {
   const [fieldFilter, setFieldFilter] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
 
+  // 🔹 Dropdown state
+  const [fieldDropdownOpen, setFieldDropdownOpen] = useState(false);
+  const [paymentDropdownOpen, setPaymentDropdownOpen] = useState(false);
+
   // 🔹 Pagination
-  const limit = 50; // show more by default
+  const limit = 10;
   const [offset, setOffset] = useState(0);
+
+  // Dropdown options
+  const fields = ["All Fields", "Football", "Cricket", "Badminton"];
+  const payments = ["All Payments", "fully_paid", "partially_paid"];
 
   // ================= FETCH =================
   useEffect(() => {
@@ -105,8 +113,12 @@ export function BookingsPage() {
             status: booking.payment_status,
           };
         })
-        // Sort by booking date/time
-        .sort((a, b) => (a.dateISO > b.dateISO ? 1 : -1));
+        .sort((a, b) => {
+          if (a.dateISO === b.dateISO) {
+            return a.time < b.time ? 1 : -1;
+          }
+          return a.dateISO < b.dateISO ? 1 : -1;
+        });
 
       setBookings(mapped);
     } catch (err) {
@@ -119,9 +131,8 @@ export function BookingsPage() {
   // ================= UI HELPERS =================
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "confirmed":
+      case "fully_paid":
         return "bg-green-100 text-green-700";
-      case "pending":
       case "partially_paid":
         return "bg-orange-100 text-orange-700";
       case "cancelled":
@@ -164,36 +175,81 @@ export function BookingsPage() {
         </div>
 
         {filterOpen && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
-            {/* Booking Date */}
-            <input
-              type="date"
-              value={bookingDate}
-              onChange={(e) => setBookingDate(e.target.value)}
-              className="border p-2 rounded"
-            />
+          <div className="relative">
+            {" "}
+            {/* Make the whole filter area relative */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
+              {/* Booking Date */}
+              <input
+                type="date"
+                value={bookingDate}
+                onChange={(e) => setBookingDate(e.target.value)}
+                className="border p-2 rounded-lg"
+              />
 
-            {/* Sport */}
-            <select
-              onChange={(e) => setFieldFilter(e.target.value)}
-              className="border p-2 rounded"
-            >
-              <option value="">All Fields</option>
-              <option value="Football">Football</option>
-              <option value="Cricket">Cricket</option>
-              <option value="Badminton">Badminton</option>
-            </select>
+              {/* Sport Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setFieldDropdownOpen(!fieldDropdownOpen)}
+                  className="w-full flex justify-between items-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition"
+                >
+                  {fieldFilter || "All Fields"}
+                  <ChevronDown className="w-4 h-4 text-gray-500 ml-2" />
+                </button>
+                {fieldDropdownOpen && (
+                  <div className="absolute left-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-50">
+                    {fields.map((field) => (
+                      <button
+                        key={field}
+                        onClick={() => {
+                          setFieldFilter(field === "All Fields" ? "" : field);
+                          setFieldDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition text-gray-700"
+                      >
+                        {field}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            {/* Payment */}
-            <select
-              onChange={(e) => setPaymentStatus(e.target.value)}
-              className="border p-2 rounded"
-            >
-              <option value="">All Payments</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-              <option value="partially_paid">Partially Paid</option>
-            </select>
+              {/* Payment Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setPaymentDropdownOpen(!paymentDropdownOpen)}
+                  className="w-full flex justify-between items-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition"
+                >
+                  {/* Display human-readable text */}
+                  {paymentStatus === "fully_paid"
+                    ? "Fully Paid"
+                    : paymentStatus === "partially_paid"
+                    ? "Partially Paid"
+                    : "All Payments"}
+                  <ChevronDown className="w-4 h-4 text-gray-500 ml-2" />
+                </button>
+                {paymentDropdownOpen && (
+                  <div className="absolute left-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-50">
+                    {payments.map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => {
+                          setPaymentStatus(p === "All Payments" ? "" : p);
+                          setPaymentDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition text-gray-700"
+                      >
+                        {p === "fully_paid"
+                          ? "Fully Paid"
+                          : p === "partially_paid"
+                          ? "Partially Paid"
+                          : p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -255,6 +311,24 @@ export function BookingsPage() {
               ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={() => setOffset((prev) => Math.max(prev - limit, 0))}
+          disabled={offset === 0}
+          className="px-4 py-2 border rounded disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <button
+          onClick={() => setOffset((prev) => prev + limit)}
+          disabled={bookings.length < limit}
+          className="px-4 py-2 border rounded disabled:opacity-50"
+        >
+          Next
+        </button>
       </div>
 
       {/* Drawer */}
