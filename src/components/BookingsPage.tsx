@@ -142,6 +142,15 @@ export function BookingsPage() {
     }
   };
 
+  const clearAllFilters = () => {
+    setSearch("");
+    setBookingDate("");
+    setFieldFilter("");
+    setPaymentStatus("");
+    setOffset(0);
+  };
+
+
   // ================= UI =================
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -158,12 +167,22 @@ export function BookingsPage() {
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by code, name, phone"
-              className="w-full pl-10 pr-4 py-2 border rounded-lg"
+              className="w-full pl-10 pr-10 py-2 border rounded-lg"
             />
+
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           <button
@@ -176,8 +195,6 @@ export function BookingsPage() {
 
         {filterOpen && (
           <div className="relative">
-            {" "}
-            {/* Make the whole filter area relative */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
               {/* Booking Date */}
               <input
@@ -249,6 +266,15 @@ export function BookingsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Clear Filters */}
+              <button
+                onClick={clearAllFilters}
+                className="md:col-span-4 mt-2 flex justify-center items-center gap-2 px-4 py-2 border rounded-lg text-red-600 hover:bg-red-50 transition"
+              >
+                <X className="w-4 h-4" />
+                Clear All Filters
+              </button>
             </div>
           </div>
         )}
