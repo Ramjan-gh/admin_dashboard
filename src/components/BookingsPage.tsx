@@ -196,7 +196,7 @@ export function BookingsPage() {
 
         {filterOpen && (
           <div className="relative">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
+            <div className="flex gap-4 items-center pt-4 border-t">
               {/* Booking Date */}
               <input
                 type="date"
@@ -209,7 +209,7 @@ export function BookingsPage() {
               <div className="relative">
                 <button
                   onClick={() => setFieldDropdownOpen(!fieldDropdownOpen)}
-                  className="w-full flex justify-between items-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition"
+                  className="w-full flex gap-4 items-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition"
                 >
                   {fieldFilter || "All Fields"}
                   <ChevronDown className="w-4 h-4 text-gray-500 ml-2" />
@@ -236,7 +236,7 @@ export function BookingsPage() {
               <div className="relative">
                 <button
                   onClick={() => setPaymentDropdownOpen(!paymentDropdownOpen)}
-                  className="w-full flex justify-between items-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition"
+                  className="w-full flex gap-4 items-center px-4 py-2 border rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition"
                 >
                   {/* Display human-readable text */}
                   {paymentStatus === "fully_paid"
@@ -271,7 +271,7 @@ export function BookingsPage() {
               {/* Clear Filters */}
               <button
                 onClick={clearAllFilters}
-                className="md:col-span-4 mt-2 flex justify-center items-center gap-2 px-4 py-2 border rounded-lg text-red-600 hover:bg-red-50 transition"
+                className="md:col-span-4 flex justify-center items-center gap-2 px-4 py-2 border rounded-lg text-red-600 hover:bg-red-50 transition"
               >
                 <X className="w-4 h-4" />
                 Clear All Filters

@@ -12,6 +12,7 @@ type Field = {
 };
 
 type Slot = {
+  shift_id: string;
   slot_id: string;
   field_id: string;
   start_time: string;
@@ -44,19 +45,17 @@ export function SlotsPage() {
 
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
-
-
   const [fieldDropdownOpen, setFieldDropdownOpen] = useState(false);
-  const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
-
-
   const [shifts, setShifts] = useState<Shift[]>([]);
 
-  // Modal-specific field selection
-  const [modalFieldId, setModalFieldId] = useState("");
+  // ================= ADD SLOT MODAL =================
+  const [addSlotModalOpen, setAddSlotModalOpen] = useState(false);
+  const [modalShiftId, setModalShiftId] = useState<string | null>(null);
+  const [modalStartTime, setModalStartTime] = useState("10:00");
+  const [modalEndTime, setModalEndTime] = useState("11:00");
+  const [addingSlot, setAddingSlot] = useState(false);
 
   const selectedField = fields.find((f) => f.id === selectedFieldId);
-  const modalSelectedField = fields.find((f) => f.id === modalFieldId);
 
   // ================= HELPERS =================
   const formatTime = (t: string) => t.slice(0, 5);
@@ -93,26 +92,18 @@ export function SlotsPage() {
           "Content-Type": "application/json",
         },
       });
-
       const data: Field[] = await res.json();
       setFields(data);
-
-      if (data.length > 0) {
-        setSelectedFieldId(data[0].id);
-        setModalFieldId(data[0].id);
-      }
+      if (data.length > 0) setSelectedFieldId(data[0].id);
     };
-
     fetchFields();
   }, []);
 
   // ================= FETCH SLOTS =================
   const fetchSlots = async () => {
     if (!selectedFieldId || !selectedDate) return;
-
     try {
       setLoading(true);
-
       const res = await fetch(
         `${BASE_URL}/rest/v1/rpc/get_slots_with_booking_details`,
         {
@@ -132,6 +123,7 @@ export function SlotsPage() {
       );
 
       const data: ShiftGroup[] = await res.json();
+      console.log("Raw Data from API:", data); 
 
       setShifts(
         data.map((g) => ({
@@ -144,6 +136,7 @@ export function SlotsPage() {
         group.slots.map((slot) => ({
           ...slot,
           field_id: selectedFieldId,
+          shift_id: group.shift_id,
           type: group.shift_name,
         }))
       );
@@ -159,6 +152,51 @@ export function SlotsPage() {
   useEffect(() => {
     fetchSlots();
   }, [selectedFieldId, selectedDate]);
+
+  // ================= ADD SLOT API =================
+  const handleAddSlot = async (shiftId: string) => {
+    console.log("Attempting to add slot for Shift ID:", shiftId);
+    if (!modalStartTime || !modalEndTime) {
+      alert("Please select start and end time");
+      return;
+    }
+
+    try {
+      setAddingSlot(true);
+
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+          Authorization: `Bearer ${
+            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+          }`,
+        },
+        body: JSON.stringify({
+          p_end_time: modalEndTime + ":00",
+          p_shift_id: shiftId,
+          p_start_time: modalStartTime + ":00",
+        }),
+      });
+
+      const data = await res.json();
+      console.log("Add Slot Response:", data);
+
+      if (data.success) {
+        alert("Slot added successfully!");
+        setAddSlotModalOpen(false);
+        fetchSlots();
+      } else {
+        alert(data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add slot");
+    } finally {
+      setAddingSlot(false);
+    }
+  };
 
   // ================= UI =================
   return (
@@ -233,12 +271,41 @@ export function SlotsPage() {
         ) : (
           Object.keys(slotsByShift).map((shift) => (
             <div key={shift}>
-              <div className="flex  mb-2 justify-between items-center">
+              <div className="flex mb-2 justify-between items-center">
                 <h3 className="font-semibold mb-2 text-lg">{shift}</h3>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg">
+                <button
+                  onClick={() => {
+                    // 1. Find the shift object by name from your 'shifts' state
+                    const foundShift = shifts.find(
+                      (s) => s.shift_name === shift
+                    );
+                    const actualShiftId = foundShift?.shift_id;
+
+                    if (!actualShiftId) {
+                      console.error(
+                        "Could not find shift_id for group:",
+                        shift,
+                        "Available shifts:",
+                        shifts
+                      );
+                      alert(
+                        `Error: Could not find ID for ${shift}. Please refresh.`
+                      );
+                      return;
+                    }
+
+                    // 2. Set the state and open modal
+                    setModalShiftId(actualShiftId);
+                    setModalStartTime("10:00");
+                    setModalEndTime("11:00");
+                    setAddSlotModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg"
+                >
                   <Plus className="w-5 h-5" /> Add Slot
                 </button>
               </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {slotsByShift[shift].map((slot) => (
                   <div
@@ -281,6 +348,55 @@ export function SlotsPage() {
           ))
         )}
       </div>
+
+      {/* ================= ADD SLOT MODAL ================= */}
+      {addSlotModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-80 space-y-4">
+            <h2 className="text-lg font-semibold">Add Slot</h2>
+            <p className="text-sm text-gray-600">
+              Shift:{" "}
+              {shifts.find((s) => s.shift_id === modalShiftId)?.shift_name}
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <label>Start Time</label>
+              <input
+                type="time"
+                value={modalStartTime}
+                onChange={(e) => setModalStartTime(e.target.value)}
+                className="border p-2 rounded"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label>End Time</label>
+              <input
+                type="time"
+                value={modalEndTime}
+                onChange={(e) => setModalEndTime(e.target.value)}
+                className="border p-2 rounded"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setAddSlotModalOpen(false)}
+                className="px-4 py-2 bg-gray-300 rounded"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => handleAddSlot(modalShiftId!)}
+                className="px-4 py-2 bg-blue-500 text-white rounded"
+                disabled={addingSlot}
+              >
+                {addingSlot ? "Adding..." : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
