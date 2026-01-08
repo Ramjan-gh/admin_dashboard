@@ -29,9 +29,9 @@ type ShiftGroup = {
   slots: Omit<Slot, "type" | "field_id">[];
 };
 
-type AddSlotResponse = {
-  success: boolean;
-  message?: string;
+type Shift = {
+  shift_id: string;
+  shift_name: string;
 };
 
 // ================= COMPONENT =================
@@ -45,21 +45,18 @@ export function SlotsPage() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Modal / UI state
-  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
-  const [blockModalOpen, setBlockModalOpen] = useState(false);
-  const [updating, setUpdating] = useState(false);
 
   const [fieldDropdownOpen, setFieldDropdownOpen] = useState(false);
   const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
 
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [newStartTime, setNewStartTime] = useState("10:00");
-  const [newEndTime, setNewEndTime] = useState("11:30");
-  const [newType, setNewType] = useState(""); // shift
-  const [adding, setAdding] = useState(false);
+
+  const [shifts, setShifts] = useState<Shift[]>([]);
+
+  // Modal-specific field selection
+  const [modalFieldId, setModalFieldId] = useState("");
 
   const selectedField = fields.find((f) => f.id === selectedFieldId);
+  const modalSelectedField = fields.find((f) => f.id === modalFieldId);
 
   // ================= HELPERS =================
   const formatTime = (t: string) => t.slice(0, 5);
@@ -96,9 +93,14 @@ export function SlotsPage() {
           "Content-Type": "application/json",
         },
       });
+
       const data: Field[] = await res.json();
       setFields(data);
-      if (data.length > 0) setSelectedFieldId(data[0].id);
+
+      if (data.length > 0) {
+        setSelectedFieldId(data[0].id);
+        setModalFieldId(data[0].id);
+      }
     };
 
     fetchFields();
@@ -131,6 +133,13 @@ export function SlotsPage() {
 
       const data: ShiftGroup[] = await res.json();
 
+      setShifts(
+        data.map((g) => ({
+          shift_id: g.shift_id,
+          shift_name: g.shift_name,
+        }))
+      );
+
       const flattened: Slot[] = data.flatMap((group) =>
         group.slots.map((slot) => ({
           ...slot,
@@ -151,92 +160,6 @@ export function SlotsPage() {
     fetchSlots();
   }, [selectedFieldId, selectedDate]);
 
-  // ================= BLOCK SLOT =================
-  const blockSlot = async () => {
-    if (!selectedSlot) return;
-
-    try {
-      setUpdating(true);
-
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/hold_slot`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-        },
-        body: JSON.stringify({
-          p_field_id: selectedSlot.field_id,
-          p_slot_id: selectedSlot.slot_id,
-          p_booking_date: selectedDate,
-          p_session_id: crypto.randomUUID(),
-          p_hold_duration_minutes: 90,
-          p_type: "maintenance",
-        }),
-      });
-
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message);
-
-      setSlots((prev) =>
-        prev.map((s) =>
-          s.slot_id === selectedSlot.slot_id
-            ? { ...s, status: "maintenance" }
-            : s
-        )
-      );
-
-      setBlockModalOpen(false);
-      setSelectedSlot(null);
-      alert("Slot blocked successfully");
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  // ================= ADD SLOT =================
-  const addSlot = async () => {
-    if (!selectedField || !newType) return;
-
-    try {
-      setAdding(true);
-
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-        },
-        body: JSON.stringify({
-          p_shift_id: newType,
-          p_start_time: newStartTime + ":00",
-          p_end_time: newEndTime + ":00",
-        }),
-      });
-
-      const data: AddSlotResponse = await res.json();
-      if (!data.success) {
-        alert(data.message);
-        return;
-      }
-
-      setAddModalOpen(false);
-      setNewStartTime("10:00");
-      setNewEndTime("11:30");
-      setNewType("");
-      fetchSlots();
-    } finally {
-      setAdding(false);
-    }
-  };
-
   // ================= UI =================
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -246,11 +169,8 @@ export function SlotsPage() {
           <h1>Slot & Schedule Management</h1>
           <p className="text-gray-500">Manage availability and bookings</p>
         </div>
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg"
-        >
-          <Plus className="w-5 h-5" /> Add Slot
+        <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg">
+          <Plus className="w-5 h-5" /> Add Shift
         </button>
       </div>
 
@@ -313,17 +233,16 @@ export function SlotsPage() {
         ) : (
           Object.keys(slotsByShift).map((shift) => (
             <div key={shift}>
-              <h3 className="font-semibold mb-2 text-lg">{shift}</h3>
+              <div className="flex  mb-2 justify-between items-center">
+                <h3 className="font-semibold mb-2 text-lg">{shift}</h3>
+                <button className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg">
+                  <Plus className="w-5 h-5" /> Add Slot
+                </button>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {slotsByShift[shift].map((slot) => (
                   <div
                     key={slot.slot_id}
-                    onClick={() => {
-                      if (slot.status === "available") {
-                        setSelectedSlot(slot);
-                        setBlockModalOpen(true);
-                      }
-                    }}
                     className={`p-4 rounded-lg border-2 transition cursor-pointer ${getStatusColor(
                       slot.status
                     )} flex flex-col justify-between`}
@@ -362,126 +281,6 @@ export function SlotsPage() {
           ))
         )}
       </div>
-
-      {/* BLOCK SLOT MODAL */}
-      {blockModalOpen && selectedSlot && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-2">Block Slot</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Block slot{" "}
-              <b>
-                {formatTime(selectedSlot.start_time)} -{" "}
-                {formatTime(selectedSlot.end_time)}
-              </b>{" "}
-              for maintenance?
-            </p>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setBlockModalOpen(false)}
-                className="px-4 py-2 rounded-lg border bg-gray-100 cursor-pointer"
-              >
-                Cancel
-              </button>
-
-              <button
-                disabled={updating}
-                onClick={blockSlot}
-                className="px-4 py-2 rounded-lg border bg-red-200"
-              >
-                {updating ? "Blocking..." : "Block Slot"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ADD SLOT MODAL */}
-      {addModalOpen && selectedField && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add New Slot</h3>
-
-            <p className="text-sm text-gray-600 mb-2">
-              Field: <b>{selectedField.name}</b>
-            </p>
-
-            <div className="mb-3">
-              <label className="text-sm text-gray-600 block mb-1">
-                Start Time
-              </label>
-              <input
-                type="time"
-                value={newStartTime}
-                onChange={(e) => setNewStartTime(e.target.value)}
-                className="border p-2 rounded-lg w-full"
-              />
-            </div>
-
-            <div className="mb-3">
-              <label className="text-sm text-gray-600 block mb-1">
-                End Time
-              </label>
-              <input
-                type="time"
-                value={newEndTime}
-                onChange={(e) => setNewEndTime(e.target.value)}
-                className="border p-2 rounded-lg w-full"
-              />
-            </div>
-
-            <div className="mb-3 relative">
-              <label className="text-sm text-gray-600 block mb-1">
-                Shift/Type
-              </label>
-              <button
-                onClick={() => setShiftDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white w-full justify-between mt-1"
-              >
-                <span className="text-gray-700">
-                  {newType || "Select Shift"}
-                </span>
-                <ChevronDown className="w-4 h-4 text-gray-500" />
-              </button>
-
-              {shiftDropdownOpen && (
-                <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-                  {[...new Set(slots.map((s) => s.type))].map((shift) => (
-                    <li
-                      key={shift}
-                      onClick={() => {
-                        setNewType(shift);
-                        setShiftDropdownOpen(false);
-                      }}
-                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      {shift}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4">
-              <button
-                onClick={() => setAddModalOpen(false)}
-                className="px-4 py-2 rounded-lg border bg-gray-100 cursor-pointer"
-              >
-                Cancel
-              </button>
-
-              <button
-                disabled={adding}
-                onClick={addSlot}
-                className="px-4 py-2 rounded-lg border bg-blue-200"
-              >
-                {adding ? "Adding..." : "Add Slot"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
