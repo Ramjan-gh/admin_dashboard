@@ -17,6 +17,7 @@ type ApiItem = {
       payment_method: string;
       payment_status: string;
       total_amount: number;
+      final_amount: number;
       status: string;
     };
   };
@@ -132,7 +133,7 @@ export function BookingsPage() {
             time: `${slot.start_time} - ${slot.end_time}`,
             sport: item.result.field.field_name,
             payment: booking.payment_method,
-            amount: booking.total_amount,
+            amount: booking.final_amount,
             status: booking.payment_status,
           };
         })
@@ -397,7 +398,6 @@ export function BookingsPage() {
           <div className="absolute inset-0" onClick={closeModal}></div>
 
           <div className="w-full max-w-md bg-white h-full overflow-y-auto p-6 relative shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-
             {detailsLoading ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -479,7 +479,7 @@ export function BookingsPage() {
                 <div className="space-y-2 border-t pt-4">
                   <div className="flex justify-between text-sm">
                     <span>Total</span>
-                    <span>৳{details.booking.total_amount}</span>
+                    <span>৳{details.booking.final_amount}</span>
                   </div>
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Paid</span>
@@ -489,7 +489,7 @@ export function BookingsPage() {
                     <span>Due</span>
                     <span className="text-red-600">
                       ৳
-                      {details.booking.total_amount -
+                      {details.booking.final_amount -
                         details.booking.paid_amount}
                     </span>
                   </div>
