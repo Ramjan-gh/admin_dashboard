@@ -92,6 +92,7 @@ export function BookingsPage() {
 
       const text = await res.text();
       const data: ApiItem[] = JSON.parse(text);
+      console.log("API response:", data);
 
       const mapped: Booking[] = data
         .map((item) => {

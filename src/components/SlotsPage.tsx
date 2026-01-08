@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar as CalendarIcon, Plus, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, Plus } from "lucide-react";
 import { ChevronDown } from "lucide-react";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
@@ -17,19 +17,22 @@ type Slot = {
   start_time: string;
   end_time: string;
   price: number;
-  type: string; // shift/type
+  type: string; // shift name
   status: "available" | "booked" | "maintenance";
   booking_code: string | null;
   full_name: string | null;
 };
 
-type AddSlotResponse = Slot & {
-  success: boolean;
-  message?: string;
-  slot_id: string; // ensure slot_id exists
-  price?: number;
+type ShiftGroup = {
+  shift_id: string;
+  shift_name: string;
+  slots: Omit<Slot, "type" | "field_id">[];
 };
 
+type AddSlotResponse = {
+  success: boolean;
+  message?: string;
+};
 
 // ================= COMPONENT =================
 export function SlotsPage() {
@@ -42,72 +45,109 @@ export function SlotsPage() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // modal state
+  // Modal / UI state
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [fieldDropdownOpen, setFieldDropdownOpen] = useState(false);
+  const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
 
-  // Add Slot modal
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newStartTime, setNewStartTime] = useState("10:00");
   const [newEndTime, setNewEndTime] = useState("11:30");
-  const [newType, setNewType] = useState("Shift-A"); // default, can be overridden
+  const [newType, setNewType] = useState(""); // shift
   const [adding, setAdding] = useState(false);
 
   const selectedField = fields.find((f) => f.id === selectedFieldId);
 
+  // ================= HELPERS =================
+  const formatTime = (t: string) => t.slice(0, 5);
+
+  const getStatusColor = (status: Slot["status"]) => {
+    switch (status) {
+      case "available":
+        return "border-green-300 bg-green-50 hover:bg-green-100";
+      case "booked":
+        return "border-purple-300 bg-purple-50";
+      case "maintenance":
+        return "border-red-300 bg-red-50";
+      default:
+        return "";
+    }
+  };
+
+  const slotsByShift = slots.reduce<Record<string, Slot[]>>((acc, slot) => {
+    if (!acc[slot.type]) acc[slot.type] = [];
+    acc[slot.type].push(slot);
+    return acc;
+  }, {});
+
   // ================= FETCH FIELDS =================
   useEffect(() => {
-    fetch(`${BASE_URL}/rest/v1/rpc/get_fields`, {
-      method: "POST",
-      headers: {
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
-        "Content-Type": "application/json",
-      },
-    })
-      .then((res) => res.json())
-      .then((data: Field[]) => {
-        setFields(data);
-        if (data.length > 0) setSelectedFieldId(data[0].id);
+    const fetchFields = async () => {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_fields`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+          Authorization: `Bearer ${
+            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+          }`,
+          "Content-Type": "application/json",
+        },
       });
+      const data: Field[] = await res.json();
+      setFields(data);
+      if (data.length > 0) setSelectedFieldId(data[0].id);
+    };
+
+    fetchFields();
   }, []);
 
   // ================= FETCH SLOTS =================
-  useEffect(() => {
+  const fetchSlots = async () => {
     if (!selectedFieldId || !selectedDate) return;
 
-    const fetchSlots = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(
-          `${BASE_URL}/rest/v1/rpc/get_slots_with_booking_details`,
-          {
-            method: "POST",
-            headers: {
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-              Authorization: `Bearer ${
-                import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-              }`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              p_field_id: selectedFieldId,
-              p_booking_date: selectedDate,
-            }),
-          }
-        );
-        const data: Slot[] = await res.json();
-        setSlots(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    try {
+      setLoading(true);
 
+      const res = await fetch(
+        `${BASE_URL}/rest/v1/rpc/get_slots_with_booking_details`,
+        {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            Authorization: `Bearer ${
+              import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+            }`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_field_id: selectedFieldId,
+            p_booking_date: selectedDate,
+          }),
+        }
+      );
+
+      const data: ShiftGroup[] = await res.json();
+
+      const flattened: Slot[] = data.flatMap((group) =>
+        group.slots.map((slot) => ({
+          ...slot,
+          field_id: selectedFieldId,
+          type: group.shift_name,
+        }))
+      );
+
+      setSlots(flattened);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchSlots();
   }, [selectedFieldId, selectedDate]);
 
@@ -138,25 +178,21 @@ export function SlotsPage() {
       });
 
       const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to block slot");
-      }
+      if (!data.success) throw new Error(data.message);
 
       setSlots((prev) =>
         prev.map((s) =>
           s.slot_id === selectedSlot.slot_id
-            ? { ...s, status: data.type || "blocked" }
+            ? { ...s, status: "maintenance" }
             : s
         )
       );
 
       setBlockModalOpen(false);
       setSelectedSlot(null);
-      alert(data.message || "Slot blocked successfully");
+      alert("Slot blocked successfully");
     } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Failed to block slot");
+      alert(err.message);
     } finally {
       setUpdating(false);
     }
@@ -164,17 +200,7 @@ export function SlotsPage() {
 
   // ================= ADD SLOT =================
   const addSlot = async () => {
-    if (!selectedField) return;
-
-    if (!newStartTime || !newEndTime || !newType) {
-      alert("Please fill all fields");
-      return;
-    }
-
-    if (newStartTime >= newEndTime) {
-      alert("End time must be after start time");
-      return;
-    }
+    if (!selectedField || !newType) return;
 
     try {
       setAdding(true);
@@ -189,72 +215,27 @@ export function SlotsPage() {
           }`,
         },
         body: JSON.stringify({
-          p_field_id: selectedField.id,
+          p_shift_id: newType,
           p_start_time: newStartTime + ":00",
           p_end_time: newEndTime + ":00",
-          p_type: newType,
         }),
       });
 
       const data: AddSlotResponse = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to add slot");
+      if (!data.success) {
+        alert(data.message);
+        return;
       }
-
-
-      // Add to slots grouped by type
-      setSlots((prev) => [
-        ...prev,
-        {
-          slot_id: data.slot_id,
-          field_id: selectedField.id,
-          start_time: newStartTime + ":00",
-          end_time: newEndTime + ":00",
-          type: newType,
-          price: data.price ?? 0,
-          status: "available",
-          booking_code: null,
-          full_name: null,
-        },
-      ]);
 
       setAddModalOpen(false);
       setNewStartTime("10:00");
       setNewEndTime("11:30");
-      setNewType("Shift-A");
-
-      alert("Slot added successfully!");
-    } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Failed to add slot");
+      setNewType("");
+      fetchSlots();
     } finally {
       setAdding(false);
     }
   };
-
-  // ================= HELPERS =================
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "booked":
-        return "bg-purple-100 border-purple-300 text-purple-700";
-      case "maintenance":
-        return "bg-red-100 border-red-300 text-red-700";
-      case "available":
-        return "bg-green-50 border-green-200 text-green-700 hover:bg-green-100 cursor-pointer";
-      default:
-        return "bg-gray-50 border-gray-200";
-    }
-  };
-
-  const formatTime = (t: string) => t.slice(0, 5);
-
-  // Group slots by type (shift)
-  const slotsByShift = slots.reduce<Record<string, Slot[]>>((acc, slot) => {
-    if (!acc[slot.type]) acc[slot.type] = [];
-    acc[slot.type].push(slot);
-    return acc;
-  }, {});
 
   // ================= UI =================
   return (
@@ -296,7 +277,7 @@ export function SlotsPage() {
               Select Field
             </label>
             <button
-              onClick={() => setDropdownOpen((prev) => !prev)}
+              onClick={() => setFieldDropdownOpen((prev) => !prev)}
               className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white w-full justify-between mt-1"
             >
               <span className="text-gray-700">
@@ -305,14 +286,14 @@ export function SlotsPage() {
               <ChevronDown className="w-4 h-4 text-gray-500" />
             </button>
 
-            {dropdownOpen && (
+            {fieldDropdownOpen && (
               <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
                 {fields.map((f) => (
                   <li
                     key={f.id}
                     onClick={() => {
                       setSelectedFieldId(f.id);
-                      setDropdownOpen(false);
+                      setFieldDropdownOpen(false);
                     }}
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                   >
@@ -325,7 +306,7 @@ export function SlotsPage() {
         </div>
       </div>
 
-      {/* Slots grouped by shift */}
+      {/* Slots Grid */}
       <div className="space-y-6">
         {loading ? (
           <p className="text-center py-10">Loading slots...</p>
@@ -382,7 +363,7 @@ export function SlotsPage() {
         )}
       </div>
 
-      {/* BLOCK MODAL */}
+      {/* BLOCK SLOT MODAL */}
       {blockModalOpen && selectedSlot && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -455,7 +436,7 @@ export function SlotsPage() {
                 Shift/Type
               </label>
               <button
-                onClick={() => setDropdownOpen((prev) => !prev)}
+                onClick={() => setShiftDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-white w-full justify-between mt-1"
               >
                 <span className="text-gray-700">
@@ -464,14 +445,14 @@ export function SlotsPage() {
                 <ChevronDown className="w-4 h-4 text-gray-500" />
               </button>
 
-              {dropdownOpen && (
+              {shiftDropdownOpen && (
                 <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
                   {[...new Set(slots.map((s) => s.type))].map((shift) => (
                     <li
                       key={shift}
                       onClick={() => {
                         setNewType(shift);
-                        setDropdownOpen(false);
+                        setShiftDropdownOpen(false);
                       }}
                       className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                     >
