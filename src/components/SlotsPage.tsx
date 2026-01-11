@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
-import { Calendar as CalendarIcon, Plus } from "lucide-react";
-import { ChevronDown } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  ChevronDown,
+  Trash2,
+} from "lucide-react";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
@@ -93,6 +97,7 @@ export function SlotsPage() {
         },
       });
       const data: Field[] = await res.json();
+      console.log("fields:", data);
       setFields(data);
       if (data.length > 0) setSelectedFieldId(data[0].id);
     };
@@ -123,7 +128,7 @@ export function SlotsPage() {
       );
 
       const data: ShiftGroup[] = await res.json();
-      console.log("Raw Data from API:", data); 
+      console.log("Raw Data from API:", data);
 
       setShifts(
         data.map((g) => ({
@@ -155,7 +160,6 @@ export function SlotsPage() {
 
   // ================= ADD SLOT API =================
   const handleAddSlot = async (shiftId: string) => {
-    console.log("Attempting to add slot for Shift ID:", shiftId);
     if (!modalStartTime || !modalEndTime) {
       alert("Please select start and end time");
       return;
@@ -163,7 +167,6 @@ export function SlotsPage() {
 
     try {
       setAddingSlot(true);
-
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
         method: "POST",
         headers: {
@@ -181,8 +184,6 @@ export function SlotsPage() {
       });
 
       const data = await res.json();
-      console.log("Add Slot Response:", data);
-
       if (data.success) {
         alert("Slot added successfully!");
         setAddSlotModalOpen(false);
@@ -198,13 +199,49 @@ export function SlotsPage() {
     }
   };
 
+  // ================= DELETE SLOT API =================
+  const handleDeleteSlot = async (slotId: string) => {
+    if (!confirm("Are you sure you want to delete this slot?")) return;
+
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_slot`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+          Authorization: `Bearer ${
+            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+          }`,
+        },
+        body: JSON.stringify({
+          p_slot_id: slotId,
+        }),
+      });
+
+      const data = await res.json();
+
+      // Handle foreign key constraint error from your response example
+      if (data.code === "23503") {
+        alert(
+          "Cannot delete: This slot has an active booking associated with it."
+        );
+        return;
+      }
+
+      fetchSlots();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete slot");
+    }
+  };
+
   // ================= UI =================
   return (
     <div className="p-4 lg:p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1>Slot & Schedule Management</h1>
+          <h1 className="text-2xl font-bold">Slot & Schedule Management</h1>
           <p className="text-gray-500">Manage availability and bookings</p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg">
@@ -215,7 +252,6 @@ export function SlotsPage() {
       {/* Controls */}
       <div className="bg-white rounded-xl p-4 border">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Date picker */}
           <div>
             <label className="text-sm text-gray-600">Select Date</label>
             <div className="flex items-center gap-2 mt-1">
@@ -229,7 +265,6 @@ export function SlotsPage() {
             </div>
           </div>
 
-          {/* Field dropdown */}
           <div className="relative">
             <label className="text-sm text-gray-600 mb-1 block">
               Select Field
@@ -275,26 +310,14 @@ export function SlotsPage() {
                 <h3 className="font-semibold mb-2 text-lg">{shift}</h3>
                 <button
                   onClick={() => {
-                    // 1. Find the shift object by name from your 'shifts' state
                     const foundShift = shifts.find(
                       (s) => s.shift_name === shift
                     );
                     const actualShiftId = foundShift?.shift_id;
-
                     if (!actualShiftId) {
-                      console.error(
-                        "Could not find shift_id for group:",
-                        shift,
-                        "Available shifts:",
-                        shifts
-                      );
-                      alert(
-                        `Error: Could not find ID for ${shift}. Please refresh.`
-                      );
+                      alert(`Error: Could not find ID for ${shift}.`);
                       return;
                     }
-
-                    // 2. Set the state and open modal
                     setModalShiftId(actualShiftId);
                     setModalStartTime("10:00");
                     setModalEndTime("11:00");
@@ -310,17 +333,17 @@ export function SlotsPage() {
                 {slotsByShift[shift].map((slot) => (
                   <div
                     key={slot.slot_id}
-                    className={`p-4 rounded-lg border-2 transition cursor-pointer ${getStatusColor(
+                    className={`p-4 rounded-lg border-2 transition relative ${getStatusColor(
                       slot.status
-                    )} flex flex-col justify-between`}
+                    )} flex flex-col justify-between h-32`}
                   >
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start mb-1">
                       <div className="text-sm font-semibold">
                         {formatTime(slot.start_time)} -{" "}
                         {formatTime(slot.end_time)}
                       </div>
                       <span
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           slot.status === "available"
                             ? "bg-green-100 text-green-700 border border-green-200"
                             : slot.status === "booked"
@@ -335,12 +358,23 @@ export function SlotsPage() {
 
                     {slot.status === "booked" && (
                       <div className="text-xs mt-1">
-                        <p className="truncate">{slot.full_name}</p>
+                        <p className="truncate font-medium">{slot.full_name}</p>
                         <p className="opacity-70">{slot.booking_code}</p>
                       </div>
                     )}
 
-                    <p className="text-xs mt-2 font-medium">৳{slot.price}</p>
+                    <div className="flex justify-between items-end mt-auto">
+                      <p className="text-xs font-bold">৳{slot.price}</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSlot(slot.slot_id);
+                        }}
+                        className="p-1.5 bg-white border border-red-200 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

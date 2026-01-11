@@ -49,7 +49,7 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar setSidebarOpen={setSidebarOpen} />
+        {/* <TopBar setSidebarOpen={setSidebarOpen} /> */}
         <main className="flex-1 overflow-y-auto">
           {renderPage()}
         </main>
