@@ -236,6 +236,7 @@ export function SlotsPage() {
       !confirm("Delete this shift and all its slots permanently?")
     )
       return;
+
     try {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_shift`, {
         method: "POST",
@@ -246,8 +247,17 @@ export function SlotsPage() {
         },
         body: JSON.stringify({ p_shift_id: shiftId }),
       });
-      if (res.ok) fetchSlots();
-      else alert("Error deleting shift.");
+
+      const data = await res.json(); // Parse the JSON response
+
+      if (res.ok && data.success !== false) {
+        // If the request was successful and data.success is not explicitly false
+        fetchSlots();
+      } else {
+        // Display the specific message from your JSON response
+        // Fallback to a default message if data.message is missing
+        alert(data.message || "Error deleting shift.");
+      }
     } catch (err) {
       alert("Network error.");
     }
