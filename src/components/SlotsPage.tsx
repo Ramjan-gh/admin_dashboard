@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit2 } from "lucide-react";
 import { FilterBar } from "./slots/FilterBar";
 import { SlotCard } from "./slots/SlotCard";
 import { AddSlotModal } from "./slots/AddSlotModal";
 import { AddShiftModal } from "./slots/AddShiftModal";
+import { UpdateShiftModal } from "./UpdateShiftModal";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
@@ -49,6 +50,14 @@ export function SlotsPage() {
   // ADD SHIFT MODAL STATE
   const [addShiftModalOpen, setAddShiftModalOpen] = useState(false);
   const [creatingShift, setCreatingShift] = useState(false);
+
+  // UPDATE SHIFT MODAL STATE
+  const [updateShiftModalOpen, setUpdateShiftModalOpen] = useState(false);
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [isUpdatingShift, setIsUpdatingShift] = useState(false);
 
   const selectedField = fields.find((f) => f.id === selectedFieldId);
 
@@ -102,13 +111,9 @@ export function SlotsPage() {
         }
       );
       const data: ShiftGroup[] = await res.json();
-
-      // Update shifts list (master list)
       setShifts(
         data.map((g) => ({ shift_id: g.shift_id, shift_name: g.shift_name }))
       );
-
-      // Update flat slots list
       setSlots(
         data.flatMap((group) =>
           group.slots.map((slot) => ({
@@ -121,6 +126,32 @@ export function SlotsPage() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateShift = async (payload: any) => {
+    setIsUpdatingShift(true);
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_shift`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setUpdateShiftModalOpen(false);
+        fetchSlots();
+      } else {
+        const error = await res.json();
+        alert(error.message || "Failed to update shift");
+      }
+    } catch (err) {
+      alert("Network error.");
+    } finally {
+      setIsUpdatingShift(false);
     }
   };
 
@@ -141,7 +172,7 @@ export function SlotsPage() {
         }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success || res.ok) {
         setAddSlotModalOpen(false);
         fetchSlots();
       } else {
@@ -188,12 +219,11 @@ export function SlotsPage() {
         },
         body: JSON.stringify(shiftData),
       });
-      const data = await res.json();
-      if (data.success || res.ok) {
+      if (res.ok) {
         setAddShiftModalOpen(false);
         fetchSlots();
       } else {
-        alert(data.message || "Failed to create shift");
+        alert("Failed to create shift");
       }
     } finally {
       setCreatingShift(false);
@@ -216,19 +246,9 @@ export function SlotsPage() {
         },
         body: JSON.stringify({ p_shift_id: shiftId }),
       });
-
-      const data = await res.json();
-
-      if (data.success || res.ok) {
-        // --- CHANGE: Alert now shows on success ---
-        alert(data.message || "Shift deleted successfully.");
-        fetchSlots();
-      } else {
-        // This handles cases where success is false but the request didn't "throw" an error
-        alert(data.message || "Error deleting shift.");
-      }
+      if (res.ok) fetchSlots();
+      else alert("Error deleting shift.");
     } catch (err) {
-      console.error("Delete shift error:", err);
       alert("Network error.");
     }
   };
@@ -241,7 +261,7 @@ export function SlotsPage() {
   }, [selectedFieldId, selectedDate]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className="p-4 lg:p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Slot Management</h1>
@@ -251,9 +271,10 @@ export function SlotsPage() {
         </div>
         <button
           onClick={() => setAddShiftModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition-all active:scale-95 shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
         >
-          <Plus className="w-5 h-5" /> Add Shift
+          <Plus className="w-5 h-5" />{" "}
+          <span className="font-medium">Add Shift</span>
         </button>
       </div>
 
@@ -281,34 +302,47 @@ export function SlotsPage() {
             const currentShiftSlots = slots.filter(
               (s) => s.shift_id === shift.shift_id
             );
-
             return (
-              <div key={shift.shift_id} className="bg-white/50 rounded-xl p-2">
-                <div className="flex mb-3 justify-between items-center border-b border-gray-100 pb-3">
+              <div
+                key={shift.shift_id}
+                className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 mb-6"
+              >
+                <div className="flex mb-3 justify-between items-center border-b border-gray-100 pb-2">
                   <div className="flex items-center gap-3">
                     <h3 className="font-bold text-lg text-gray-700">
                       {shift.shift_name}
                     </h3>
-                    <button
-                      onClick={() => handleDeleteShift(shift.shift_id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                      title="Delete Shift"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-4 border p-2 rounded-lg">
+                      <button
+                        onClick={() => {
+                          setSelectedShiftForEdit({
+                            id: shift.shift_id,
+                            name: shift.shift_name,
+                          });
+                          setUpdateShiftModalOpen(true);
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteShift(shift.shift_id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-
                   <button
                     onClick={() => {
                       setModalShiftId(shift.shift_id);
                       setAddSlotModalOpen(true);
                     }}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-sm font-medium hover:bg-blue-600 hover:text-white transition-all"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-semibold hover:bg-blue-600 hover:text-white transition-all"
                   >
                     <Plus className="w-4 h-4" /> Add Slot
                   </button>
                 </div>
-
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {currentShiftSlots.length > 0 ? (
                     currentShiftSlots.map((slot) => (
@@ -321,10 +355,8 @@ export function SlotsPage() {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full py-10 border-2 border-dashed border-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400">
-                      <p className="text-sm italic">
-                        No slots added to this shift yet.
-                      </p>
+                    <div className="col-span-full py-10 border-2 border-dashed border-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400 text-sm italic">
+                      No slots added to this shift yet.
                     </div>
                   )}
                 </div>
@@ -333,6 +365,15 @@ export function SlotsPage() {
           })
         )}
       </div>
+
+      {/* MODALS */}
+      <UpdateShiftModal
+        isOpen={updateShiftModalOpen}
+        onClose={() => setUpdateShiftModalOpen(false)}
+        onUpdate={handleUpdateShift}
+        shift={selectedShiftForEdit}
+        loading={isUpdatingShift}
+      />
 
       <AddSlotModal
         isOpen={addSlotModalOpen}
@@ -344,7 +385,7 @@ export function SlotsPage() {
         endTime={modalEndTime}
         setEndTime={setModalEndTime}
         loading={addingSlot}
-        shiftId={modalShiftId}
+        shiftId={modalShiftId || ""}
       />
 
       <AddShiftModal

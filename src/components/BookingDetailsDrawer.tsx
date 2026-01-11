@@ -27,7 +27,7 @@ export function BookingDetailsDrawer({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-[100]">
       <div className="absolute inset-0" onClick={onClose}></div>
-      <div className=" bg-white h-full overflow-y-auto relative shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+      <div className=" bg-white h-full overflow-y-auto relative shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col ">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
