@@ -86,6 +86,7 @@ type BookingDetails = {
     discount_code: string; // Added
     no_of_players: number; // Added
   };
+  discount_code: string;
 };
 
 // ================= COMPONENT =================
@@ -185,6 +186,7 @@ export function BookingsPage() {
       });
       const data = await res.json();
       setDetails(data);
+      console.log("Fetched details:", data.discount_code);
     } catch (err) {
       console.error("Error fetching details:", err);
     } finally {
@@ -598,7 +600,7 @@ export function BookingsPage() {
                           <div className="flex items-center gap-2">
                             <Tag className="w-3 h-3 text-red-600" />
                             <span className="text-red-600 font-medium uppercase text-[10px]">
-                              Discount ({details.booking.discount_code})
+                              Discount ({details.discount_code})
                             </span>
                           </div>
                           <span className="font-bold text-red-600">

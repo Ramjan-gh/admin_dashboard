@@ -97,7 +97,6 @@ export function SlotsPage() {
         },
       });
       const data: Field[] = await res.json();
-      console.log("fields:", data);
       setFields(data);
       if (data.length > 0) setSelectedFieldId(data[0].id);
     };
@@ -128,7 +127,6 @@ export function SlotsPage() {
       );
 
       const data: ShiftGroup[] = await res.json();
-      console.log("Raw Data from API:", data);
 
       setShifts(
         data.map((g) => ({
@@ -220,7 +218,6 @@ export function SlotsPage() {
 
       const data = await res.json();
 
-      // Handle foreign key constraint error from your response example
       if (data.code === "23503") {
         alert(
           "Cannot delete: This slot has an active booking associated with it."
@@ -249,8 +246,8 @@ export function SlotsPage() {
         </button>
       </div>
 
-      {/* Controls */}
-      <div className="bg-white rounded-xl p-4 border">
+      {/* Controls - FIXED: added relative and z-20 to stay above the grid */}
+      <div className="bg-white rounded-xl p-4 border relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm text-gray-600">Select Date</label>
@@ -280,7 +277,7 @@ export function SlotsPage() {
             </button>
 
             {fieldDropdownOpen && (
-              <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
+              <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-auto">
                 {fields.map((f) => (
                   <li
                     key={f.id}
@@ -299,8 +296,8 @@ export function SlotsPage() {
         </div>
       </div>
 
-      {/* Slots Grid */}
-      <div className="space-y-6">
+      {/* Slots Grid - FIXED: added relative and z-10 to stay below controls */}
+      <div className="space-y-6 relative z-10">
         {loading ? (
           <p className="text-center py-10">Loading slots...</p>
         ) : (
@@ -385,7 +382,7 @@ export function SlotsPage() {
 
       {/* ================= ADD SLOT MODAL ================= */}
       {addSlotModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
           <div className="bg-white rounded-lg p-6 w-80 space-y-4">
             <h2 className="text-lg font-semibold">Add Slot</h2>
             <p className="text-sm text-gray-600">

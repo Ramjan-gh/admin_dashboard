@@ -17,7 +17,7 @@ export function TopBar({ setSidebarOpen }: TopBarProps) {
         </button>
 
         {/* Search */}
-        <div className="flex-1 max-w-2xl">
+        {/* <div className="flex-1 max-w-2xl">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -26,15 +26,15 @@ export function TopBar({ setSidebarOpen }: TopBarProps) {
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Actions */}
         <div className="flex items-center gap-3">
           {/* Notifications */}
-          <button className="relative p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+          {/* <button className="relative p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
             <Bell className="w-5 h-5" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-pink-500 rounded-full" />
-          </button>
+          </button> */}
 
           {/* Profile */}
           <button className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
