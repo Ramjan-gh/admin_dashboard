@@ -263,6 +263,51 @@ export function SlotsPage() {
     }
   };
 
+  const handleToggleMaintenance = async (slot: Slot) => {
+    const isMaintenance = slot.status === "maintenance";
+
+    // Decide which RPC to call based on current status
+    const endpoint = isMaintenance
+      ? "remove_slot_from_maintenance"
+      : "reserve_slot_for_maintenance";
+
+    // Prepare body based on your API requirements
+    // Note: Ensure your 'get_slots_with_booking_details' returns 'maintenance_id'
+    const body = isMaintenance
+      ? { p_maintenance_id: (slot as any).maintenance_id }
+      : { p_slot_id: slot.slot_id, p_date: selectedDate };
+
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      // Notify user with the message from your API
+      if (res.ok) {
+        // If the API returns success: true, refresh the list
+        if (data.success !== false) {
+          alert(data.message || "Operation successful");
+          fetchSlots();
+        } else {
+          // If success is false, show the error message from the API
+          alert(`Issue: ${data.message}`);
+        }
+      } else {
+        alert(data.message || "Failed to contact server");
+      }
+    } catch (err) {
+      alert("Network error. Please try again.");
+    }
+  };
+
   useEffect(() => {
     fetchFields();
   }, []);
@@ -271,8 +316,8 @@ export function SlotsPage() {
   }, [selectedFieldId, selectedDate]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center">
+    <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Slot Management</h1>
           <p className="text-gray-500 text-sm">
@@ -301,7 +346,7 @@ export function SlotsPage() {
         }}
       />
 
-      <div className="space-y-8 relative z-10">
+      <div className="space-y-8 relative z-10 mt-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
@@ -360,6 +405,9 @@ export function SlotsPage() {
                         key={slot.slot_id}
                         slot={slot}
                         onDelete={handleDeleteSlot}
+                        onToggleMaintenance={() =>
+                          handleToggleMaintenance(slot)
+                        }
                         formatTime={formatTime}
                         getStatusColor={getStatusColor}
                       />

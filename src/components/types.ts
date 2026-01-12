@@ -44,7 +44,7 @@ export type BookingDetails = {
     payment_status: string;
     discount_amount: number;
     discount_code: string;
-    no_of_players: number;
+    number_of_players: number;
   };
   discount_code: string;
 };

@@ -101,61 +101,63 @@ export function BookingsPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="p-4 lg:p-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-semibold">Bookings Management</h1>
         <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg transition-transform active:scale-95">
           <Plus className="w-5 h-5" /> Add Booking
         </button>
       </div>
 
-      <BookingFilters
-        search={search}
-        setSearch={setSearch}
-        bookingDate={bookingDate}
-        setBookingDate={setBookingDate}
-        fieldFilter={fieldFilter}
-        setFieldFilter={setFieldFilter}
-        paymentStatus={paymentStatus}
-        setPaymentStatus={setPaymentStatus}
-        onClear={() => {
-          setSearch("");
-          setBookingDate("");
-          setFieldFilter("");
-          setPaymentStatus("");
-          setOffset(0);
-        }}
-      />
+      <div className="flex flex-col gap-6">
+        <BookingFilters
+          search={search}
+          setSearch={setSearch}
+          bookingDate={bookingDate}
+          setBookingDate={setBookingDate}
+          fieldFilter={fieldFilter}
+          setFieldFilter={setFieldFilter}
+          paymentStatus={paymentStatus}
+          setPaymentStatus={setPaymentStatus}
+          onClear={() => {
+            setSearch("");
+            setBookingDate("");
+            setFieldFilter("");
+            setPaymentStatus("");
+            setOffset(0);
+          }}
+        />
 
-      <BookingsTable
-        bookings={bookings}
-        loading={loading}
-        onView={(b) => {
-          setSelectedBooking(b);
-          fetchBookingDetails(b.bookingCode);
-        }}
-      />
+        <BookingsTable
+          bookings={bookings}
+          loading={loading}
+          onView={(b) => {
+            setSelectedBooking(b);
+            fetchBookingDetails(b.bookingCode);
+          }}
+        />
 
-      {/* Pagination */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
-        <p className="text-sm text-gray-500">
-          Showing {bookings.length} results
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setOffset((p) => Math.max(p - limit, 0))}
-            disabled={offset === 0}
-            className="px-4 py-2 border rounded-lg disabled:opacity-30 hover:bg-gray-50 transition-colors"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setOffset((p) => p + limit)}
-            disabled={bookings.length < limit}
-            className="px-4 py-2 border rounded-lg disabled:opacity-30 hover:bg-gray-50 transition-colors"
-          >
-            Next
-          </button>
+        {/* Pagination */}
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
+          <p className="text-sm text-gray-500">
+            Showing {bookings.length} results
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setOffset((p) => Math.max(p - limit, 0))}
+              disabled={offset === 0}
+              className="px-4 py-2 border rounded-lg disabled:opacity-30 hover:bg-gray-50 transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setOffset((p) => p + limit)}
+              disabled={bookings.length < limit}
+              className="px-4 py-2 border rounded-lg disabled:opacity-30 hover:bg-gray-50 transition-colors"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 

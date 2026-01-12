@@ -1,8 +1,9 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, Ban } from "lucide-react";
 
 interface SlotCardProps {
   slot: any;
-  onDelete: (id: string) => void; // This must receive the slot_id
+  onDelete: (id: string) => void;
+  onToggleMaintenance: () => void; // Prop passed from SlotsPage
   formatTime: (t: string) => string;
   getStatusColor: (status: string) => string;
 }
@@ -10,9 +11,12 @@ interface SlotCardProps {
 export function SlotCard({
   slot,
   onDelete,
+  onToggleMaintenance,
   formatTime,
   getStatusColor,
 }: SlotCardProps) {
+  const isMaintenance = slot.status === "maintenance";
+
   return (
     <div
       className={`p-4 rounded-lg border-2 transition relative ${getStatusColor(
@@ -45,17 +49,39 @@ export function SlotCard({
 
       <div className="flex justify-between items-end mt-auto">
         <p className="text-xs font-bold">৳{slot.price}</p>
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log("Delete button clicked for ID:", slot.slot_id);
-            onDelete(slot.slot_id); // Ensure this is slot.slot_id
-          }}
-          className="p-1.5 bg-white border border-red-200 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"
-        >
-          <Trash2 className="w-4 h-4 z-10" />
-        </button>
+
+        <div className="flex gap-2">
+          {/* Maintenance Toggle Button */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleMaintenance();
+            }}
+            title={
+              isMaintenance ? "Remove from maintenance" : "Set to maintenance"
+            }
+            className={`p-1.5 border rounded transition-colors ${
+              isMaintenance
+                ? "bg-orange-500 border-orange-600 text-white hover:bg-orange-600"
+                : "bg-white border-gray-200 text-gray-400 hover:text-orange-500 hover:border-orange-200 hover:bg-orange-50"
+            }`}
+          >
+            <Ban className="w-4 h-4" />
+          </button>
+
+          {/* Delete Button */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(slot.slot_id);
+            }}
+            className="p-1.5 bg-white border border-red-200 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

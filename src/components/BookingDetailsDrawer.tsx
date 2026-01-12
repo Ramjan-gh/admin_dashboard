@@ -122,7 +122,7 @@ export function BookingDetailsDrawer({
                           Total Players
                         </p>
                         <p className="font-bold text-gray-900">
-                          {details.booking.no_of_players || 0} Expected
+                          {details.booking.number_of_players || 0} Expected
                         </p>
                       </div>
                     </div>
