@@ -219,12 +219,27 @@ export function SlotsPage() {
         },
         body: JSON.stringify(shiftData),
       });
+
+      // 1. Parse the response body first
+      const data = await res.json();
+
       if (res.ok) {
-        setAddShiftModalOpen(false);
-        fetchSlots();
+        // 2. Check if the API returned a success flag or if it's a straight success
+        if (data.success !== false) {
+          // Show the success message from API (e.g., "Shift created successfully")
+          alert(data.message || "Shift created successfully");
+          setAddShiftModalOpen(false);
+          fetchSlots();
+        } else {
+          // Handle case where res is 200/201 but the logic failed (custom error)
+          alert(data.message || "Failed to create shift");
+        }
       } else {
-        alert("Failed to create shift");
+        // 3. Handle HTTP errors (400, 401, 500 etc.) using the API's error message
+        alert(data.message || "Failed to create shift");
       }
+    } catch (err) {
+      alert("Network error. Please try again.");
     } finally {
       setCreatingShift(false);
     }

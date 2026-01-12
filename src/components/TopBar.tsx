@@ -1,47 +1,92 @@
-import { Search, Bell, Menu } from 'lucide-react';
+import { Menu, LogOut, User } from "lucide-react";
+import { useState } from "react";
 
 interface TopBarProps {
   setSidebarOpen: (open: boolean) => void;
+  onLogout: () => void;
 }
 
-export function TopBar({ setSidebarOpen }: TopBarProps) {
+export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Get user data from localStorage
+  const userJson = localStorage.getItem("sb-user");
+  const user = userJson ? JSON.parse(userJson) : null;
+  const fullName = user?.user_metadata?.full_name || "Admin User";
+
+  // Create initials (e.g., "John Doe" -> "JD")
+  const initials = fullName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
-    <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4">
+    <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 relative z-20">
       <div className="flex items-center justify-between gap-4">
         {/* Mobile menu button */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="lg:hidden text-gray-700 hover:text-gray-900"
+          className="lg:hidden text-gray-700 hover:text-gray-900 p-1"
         >
           <Menu className="w-6 h-6" />
         </button>
 
-        {/* Search */}
-        {/* <div className="flex-1 max-w-2xl">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search bookings, customers, turfs..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-          </div>
-        </div> */}
+        {/* Spacer for desktop layout since search is hidden */}
+        <div className="hidden lg:block">
+          <h2 className="text-sm font-medium text-gray-500 italic">
+            Welcome back,{" "}
+            <span className="text-gray-900 font-bold not-italic">
+              {fullName}
+            </span>
+          </h2>
+        </div>
 
         {/* Actions */}
         <div className="flex items-center gap-3">
-          {/* Notifications */}
-          {/* <button className="relative p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-pink-500 rounded-full" />
-          </button> */}
+          <div className="relative">
+            {/* Profile Toggle Button */}
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-colors border border-transparent hover:border-gray-200"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center shadow-sm">
+                <span className="text-white text-xs font-bold">{initials}</span>
+              </div>
+            </button>
 
-          {/* Profile */}
-          <button className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center">
-              <span className="text-white text-sm">SA</span>
-            </div>
-          </button>
+            {/* Simple Profile Dropdown */}
+            {showProfileMenu && (
+              <>
+                {/* Invisible backdrop to close menu */}
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setShowProfileMenu(false)}
+                />
+
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-xs text-gray-400">Signed in as</p>
+                    <p className="text-sm font-semibold truncate">
+                      {user?.email}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </header>
