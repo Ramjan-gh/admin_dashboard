@@ -6,10 +6,11 @@ import { DashboardHome } from './components/DashboardHome';
 import { BookingsPage } from './components/BookingsPage';
 import { SlotsPage } from './components/SlotsPage';
 import { TurfsPage } from './components/TurfsPage';
-import { PaymentsPage } from './components/PaymentsPage';
-import { UsersPage } from './components/UsersPage';
-import { MessagesPage } from './components/MessagesPage';
+// import { PaymentsPage } from './components/PaymentsPage';
+// import { UsersPage } from './components/UsersPage';
+// import { MessagesPage } from './components/MessagesPage';
 import { SettingsPage } from './components/SettingsPage';
+import { ProfilePage } from "./components/ProfilePage";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
@@ -40,14 +41,20 @@ export default function App() {
         return <SlotsPage />;
       case "turfs":
         return <TurfsPage />;
-      case "payments":
-        return <PaymentsPage />;
-      case "users":
-        return <UsersPage />;
-      case "messages":
-        return <MessagesPage />;
+
+      // case "payments":
+      //   return <PaymentsPage />;
+
+      // case "users":
+      //   return <UsersPage />;
+
+      // case "messages":
+      //   return <MessagesPage />;
+
       case "settings":
         return <SettingsPage />;
+      case "profile":
+        return <ProfilePage />;
       default:
         return <DashboardHome />;
     }
@@ -75,7 +82,11 @@ export default function App() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* You might want to pass handleLogout to TopBar too */}
-        <TopBar setSidebarOpen={setSidebarOpen} onLogout={handleLogout} />
+        <TopBar
+          setSidebarOpen={setSidebarOpen}
+          onLogout={handleLogout}
+          setCurrentPage={setCurrentPage}
+        />
         <main className="flex-1 overflow-y-auto">{renderPage()}</main>
       </div>
 

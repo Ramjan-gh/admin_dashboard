@@ -1,16 +1,13 @@
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  CreditCard, 
-  Users, 
-  MessageSquare, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Clock,
+  MapPin,
+  Settings,
   X,
-  LogOut 
-} from 'lucide-react';
-
+  LogOut,
+  UserCircle, // Added this for the profile icon
+} from "lucide-react";
 
 interface SidebarProps {
   currentPage: string;
@@ -27,8 +24,6 @@ export function Sidebar({
   setSidebarOpen,
   onLogout,
 }: SidebarProps) {
-
-  // Get user data from localStorage
   const userJson = localStorage.getItem("sb-user");
   const user = userJson ? JSON.parse(userJson) : null;
   const fullName = user?.user_metadata?.full_name || "Super Admin";
@@ -39,20 +34,18 @@ export function Sidebar({
     .join("")
     .toUpperCase();
 
+  // Updated menuItems to include Profile
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "bookings", label: "Bookings", icon: Calendar },
     { id: "slots", label: "Slots & Schedule", icon: Clock },
     { id: "turfs", label: "Turfs & Sports", icon: MapPin },
-    { id: "payments", label: "Payments", icon: CreditCard },
-    { id: "users", label: "Customers", icon: Users },
-    { id: "messages", label: "Messages", icon: MessageSquare },
+    { id: "profile", label: "My Profile", icon: UserCircle }, // Added Profile here
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
     <>
-      {/* Sidebar for desktop and mobile */}
       <aside
         className={`
           fixed lg:static inset-y-0 left-0 z-30
@@ -64,26 +57,26 @@ export function Sidebar({
         `}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
+          {/* Logo Section */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
                 <span className="text-white font-bold">TB</span>
               </div>
               <div>
-                <h1 className="text-gray-900">TurfBook</h1>
+                <h1 className="text-gray-900 font-bold">TurfBook</h1>
                 <p className="text-xs text-gray-500">Admin Portal</p>
               </div>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className="lg:hidden text-gray-500"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Navigation */}
+          {/* Navigation Section */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -106,29 +99,32 @@ export function Sidebar({
                   `}
                 >
                   <Icon className="w-5 h-5" />
-                  <span>{item.label}</span>
+                  <span className="font-medium">{item.label}</span>
                 </button>
               );
             })}
           </nav>
 
-          {/* User Info */}
+          {/* User Info & Profile Quick Link */}
           <div className="p-4 border-t border-gray-200 space-y-2">
-            {/* Dynamic User Profile */}
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
+            <button
+              onClick={() => setCurrentPage("profile")}
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
                 <span className="text-white text-sm font-bold">{initials}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{fullName}</p>
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {fullName}
+                </p>
                 <p className="text-xs text-gray-500 truncate">{email}</p>
               </div>
-            </div>
+            </button>
 
-            {/* Logout Button */}
             <button
               onClick={() => {
-                if(confirm("Are you sure you want to logout?")) {
+                if (confirm("Are you sure you want to logout?")) {
                   onLogout();
                 }
               }}

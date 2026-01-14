@@ -50,23 +50,32 @@ export function BookingsPage() {
       const data: ApiItem[] = await res.json();
       const mapped: Booking[] = data
         .map((item) => {
-          const slot = item.result.slots[0];
+          // 1. Get references with safe fallbacks
+          const slots = item.result.slots || [];
+          const slot = slots[0]; // This might be undefined
           const booking = item.result.booking;
+
           return {
             id: booking.id,
             bookingCode: booking.booking_code,
             customer: booking.full_name,
             phone: booking.phone_number,
             email: booking.email,
-            dateISO: slot.booking_date,
-            dateDisplay: new Date(slot.booking_date).toDateString(),
-            time: `${slot.start_time} - ${slot.end_time}`,
+            // 2. Use Optional Chaining (?.) and provide default values
+            dateISO: slot?.booking_date || "",
+            dateDisplay: slot?.booking_date
+              ? new Date(slot.booking_date).toDateString()
+              : "No Date Set",
+            time: slot
+              ? `${slot.start_time} - ${slot.end_time}`
+              : "No Time Set",
             sport: item.result.field.field_name,
             payment: booking.payment_method,
             amount: booking.final_amount,
             status: booking.payment_status,
           };
         })
+        // 3. Sort carefully - handle empty strings/dates
         .sort((a, b) => (a.dateISO < b.dateISO ? 1 : -1));
 
       setBookings(mapped);

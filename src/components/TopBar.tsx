@@ -1,12 +1,17 @@
-import { Menu, LogOut, User } from "lucide-react";
+import { Menu, LogOut, User, UserCircle } from "lucide-react";
 import { useState } from "react";
 
 interface TopBarProps {
   setSidebarOpen: (open: boolean) => void;
   onLogout: () => void;
+  setCurrentPage: (page: string) => void;
 }
 
-export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
+export function TopBar({
+  setSidebarOpen,
+  onLogout,
+  setCurrentPage,
+}: TopBarProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   // Get user data from localStorage
@@ -14,7 +19,7 @@ export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
   const user = userJson ? JSON.parse(userJson) : null;
   const fullName = user?.user_metadata?.full_name || "Admin User";
 
-  // Create initials (e.g., "John Doe" -> "JD")
+  // Create initials
   const initials = fullName
     .split(" ")
     .map((n: string) => n[0])
@@ -33,7 +38,7 @@ export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
           <Menu className="w-6 h-6" />
         </button>
 
-        {/* Spacer for desktop layout since search is hidden */}
+        {/* Welcome Text */}
         <div className="hidden lg:block">
           <h2 className="text-sm font-medium text-gray-500 italic">
             Welcome back,{" "}
@@ -46,7 +51,6 @@ export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
         {/* Actions */}
         <div className="flex items-center gap-3">
           <div className="relative">
-            {/* Profile Toggle Button */}
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-colors border border-transparent hover:border-gray-200"
@@ -56,33 +60,48 @@ export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
               </div>
             </button>
 
-            {/* Simple Profile Dropdown */}
             {showProfileMenu && (
               <>
-                {/* Invisible backdrop to close menu */}
                 <div
                   className="fixed inset-0 z-10"
                   onClick={() => setShowProfileMenu(false)}
                 />
 
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
-                  <div className="px-4 py-2 border-b border-gray-100">
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-xs text-gray-400">Signed in as</p>
-                    <p className="text-sm font-semibold truncate">
+                    <p className="text-sm font-semibold truncate text-gray-900">
                       {user?.email}
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setShowProfileMenu(false);
-                      onLogout();
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </button>
+                  <div className="p-1">
+                    {/* Profile Link */}
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setCurrentPage("profile");
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <UserCircle className="w-4 h-4 text-gray-400" />
+                      My Profile
+                    </button>
+
+                    <div className="h-px bg-gray-100 my-1" />
+
+                    {/* Logout Button */}
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </button>
+                  </div>
                 </div>
               </>
             )}

@@ -344,7 +344,7 @@ export function SlotsPage() {
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
         >
           <Plus className="w-5 h-5" />{" "}
-          <span className="font-medium">Add Shift</span>
+          <span className="font-medium">Add New Shift</span>
         </button>
       </div>
 
