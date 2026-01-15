@@ -16,24 +16,7 @@ export function ProfilePage() {
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-      {/* Header Profile Section */}
-      <div className="relative mb-8">
-        <div className="h-32 w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-t-2xl"></div>
-        <div className="absolute -bottom-14 left-8 flex items-end gap-6">
-          <div className="w-24 h-24 rounded-2xl bg-white p-1 shadow-xl">
-            <div className="w-full h-full rounded-xl bg-gradient-to-br from-gray-100 to-gray-300 flex items-center justify-center text-3xl font-bold text-gray-700">
-              {fullName.charAt(0).toUpperCase()}
-            </div>
-          </div>
-          <div className="">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              {fullName}
-              <BadgeCheck className="w-6 h-6 text-blue-500" />
-            </h1>
-            <p className="text-gray-500 font-medium">{role}</p>
-          </div>
-        </div>
-      </div>
+      
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20">
         {/* Left Column: Brief Stats */}
@@ -94,23 +77,7 @@ export function ProfilePage() {
                   <p className="text-sm  text-gray-900">{email}</p>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
-                  Location
-                </label>
-                <div className="flex items-center gap-2 text-gray-900 font-medium">
-                  <MapPin className="w-4 h-4 text-pink-500" />
-                  Admin HQ, Bengaluru
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
-                  Account ID
-                </label>
-                <div className="text-mono text-xs text-gray-500 truncate">
-                  {user?.id || "USR-99283-ID"}
-                </div>
-              </div>
+              
             </div>
           </div>
 
@@ -123,8 +90,7 @@ export function ProfilePage() {
                 <h4 className="font-bold text-blue-900">Security Note</h4>
                 <p className="text-sm text-blue-700 mt-1">
                   You are currently logged in as a Super Admin. To change your
-                  password or security settings, please visit the System
-                  Settings page.
+                  password or security settings, please contact authority.
                 </p>
               </div>
             </div>

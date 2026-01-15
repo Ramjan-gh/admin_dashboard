@@ -1,25 +1,21 @@
-import { Menu, LogOut, User, UserCircle } from "lucide-react";
+import { Menu, LogOut, UserCircle } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
 
 interface TopBarProps {
   setSidebarOpen: (open: boolean) => void;
   onLogout: () => void;
-  setCurrentPage: (page: string) => void;
+  // setCurrentPage is no longer needed
 }
 
-export function TopBar({
-  setSidebarOpen,
-  onLogout,
-  setCurrentPage,
-}: TopBarProps) {
+export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const navigate = useNavigate(); // Initialize the navigate hook
 
-  // Get user data from localStorage
   const userJson = localStorage.getItem("sb-user");
   const user = userJson ? JSON.parse(userJson) : null;
   const fullName = user?.user_metadata?.full_name || "Admin User";
 
-  // Create initials
   const initials = fullName
     .split(" ")
     .map((n: string) => n[0])
@@ -76,11 +72,11 @@ export function TopBar({
                   </div>
 
                   <div className="p-1">
-                    {/* Profile Link */}
+                    {/* Updated Profile Link to use Navigate */}
                     <button
                       onClick={() => {
                         setShowProfileMenu(false);
-                        setCurrentPage("profile");
+                        navigate("/profile"); // Use navigate instead of setCurrentPage
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                     >
@@ -90,7 +86,6 @@ export function TopBar({
 
                     <div className="h-px bg-gray-100 my-1" />
 
-                    {/* Logout Button */}
                     <button
                       onClick={() => {
                         setShowProfileMenu(false);

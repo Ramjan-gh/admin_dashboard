@@ -2,24 +2,21 @@ import {
   LayoutDashboard,
   Calendar,
   Clock,
-  MapPin,
   Settings,
   X,
   LogOut,
-  UserCircle, // Added this for the profile icon
+  UserCircle,
+  LandPlot,
 } from "lucide-react";
+import { NavLink } from "react-router-dom"; // Import NavLink
 
 interface SidebarProps {
-  currentPage: string;
-  setCurrentPage: (page: string) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   onLogout: () => void;
 }
 
 export function Sidebar({
-  currentPage,
-  setCurrentPage,
   sidebarOpen,
   setSidebarOpen,
   onLogout,
@@ -34,13 +31,12 @@ export function Sidebar({
     .join("")
     .toUpperCase();
 
-  // Updated menuItems to include Profile
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "", label: "Dashboard", icon: LayoutDashboard }, // ID empty for home route
     { id: "bookings", label: "Bookings", icon: Calendar },
-    { id: "slots", label: "Slots & Schedule", icon: Clock },
-    { id: "turfs", label: "Turfs & Sports", icon: MapPin },
-    { id: "profile", label: "My Profile", icon: UserCircle }, // Added Profile here
+    { id: "slots", label: "Shifts & Slots", icon: Clock },
+    { id: "turfs", label: "Fields", icon: LandPlot },
+    { id: "profile", label: "My Profile", icon: UserCircle },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -80,15 +76,12 @@ export function Sidebar({
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = currentPage === item.id;
               return (
-                <button
+                <NavLink
                   key={item.id}
-                  onClick={() => {
-                    setCurrentPage(item.id);
-                    setSidebarOpen(false);
-                  }}
-                  className={`
+                  to={`/${item.id}`}
+                  onClick={() => setSidebarOpen(false)}
+                  className={({ isActive }) => `
                     w-full flex items-center gap-3 px-4 py-3 rounded-lg
                     transition-all duration-200
                     ${
@@ -100,16 +93,24 @@ export function Sidebar({
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
-                </button>
+                </NavLink>
               );
             })}
           </nav>
 
           {/* User Info & Profile Quick Link */}
           <div className="p-4 border-t border-gray-200 space-y-2">
-            <button
-              onClick={() => setCurrentPage("profile")}
-              className="w-full flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            <NavLink
+              to="/profile"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `
+                w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left
+                ${
+                  isActive
+                    ? "bg-gray-100 ring-1 ring-gray-200"
+                    : "bg-gray-50 hover:bg-gray-100"
+                }
+              `}
             >
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
                 <span className="text-white text-sm font-bold">{initials}</span>
@@ -120,7 +121,7 @@ export function Sidebar({
                 </p>
                 <p className="text-xs text-gray-500 truncate">{email}</p>
               </div>
-            </button>
+            </NavLink>
 
             <button
               onClick={() => {

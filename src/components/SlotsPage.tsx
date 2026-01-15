@@ -341,7 +341,7 @@ export function SlotsPage() {
         </div>
         <button
           onClick={() => setAddShiftModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition-all shadow-md"
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg transition-transform active:scale-95"
         >
           <Plus className="w-5 h-5" />{" "}
           <span className="font-medium">Add New Shift</span>
