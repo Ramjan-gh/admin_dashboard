@@ -66,8 +66,8 @@ export function SettingsPage() {
     p_code: "",
     p_discount_type: "percentage",
     p_discount_value: "",
-    p_valid_from: null as string | null, 
-    p_valid_until: null as string | null, 
+    p_valid_from: "" as string,
+    p_valid_until: "" as string,
     p_max_uses: null as number | null,
     p_is_active: true,
   });
@@ -150,13 +150,38 @@ export function SettingsPage() {
   };
 
   const handleAddSchedule = async () => {
+    // 1. Client-side validation for empty notes
     if (!newHoliday.p_date) return alert("Date is required");
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_business_schedule`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(newHoliday),
-    });
-    if (res.ok) fetchAllData();
+    if (!newHoliday.p_notes || newHoliday.p_notes.trim() === "") {
+      return alert(
+        "Note cannot be empty. Please provide a title for the holiday."
+      );
+    }
+
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_business_schedule`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(newHoliday),
+      });
+
+      // 2. Handle API Errors (e.g., duplicate date)
+      if (!res.ok) {
+        const errorData = await res.json();
+        // This captures the "Business schedule for date... already exists" message
+        alert(errorData.message || "Failed to add schedule");
+        return;
+      }
+
+      // 3. Success logic
+      alert("Schedule added successfully");
+      // Clear form (optional)
+      setNewHoliday({ p_date: "", p_is_open: false, p_notes: "" });
+      fetchAllData();
+    } catch (error) {
+      console.error("Connection error:", error);
+      alert("A network error occurred.");
+    }
   };
 
   const handleDeleteSchedule = async (id: string) => {
@@ -173,17 +198,50 @@ export function SettingsPage() {
   };
 
   const handleAddDiscount = async () => {
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_discount`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(newDiscount),
-    });
-    const data = await res.json();
-    if (res.ok && (data[0]?.success || !data.error)) {
-      setHasChanges(false);
+    // 1. Client-side Null/Empty Validation
+    if (!newDiscount.p_code.trim()) return alert("Discount code is required");
+    if (!newDiscount.p_discount_value)
+      return alert("Discount value is required");
+    if (!newDiscount.p_valid_from) return alert("Valid From date is required");
+
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_discount`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          ...newDiscount,
+          p_discount_value: parseFloat(newDiscount.p_discount_value),
+        }),
+      });
+
+      const data = await res.json();
+
+      // --- KEY FIX STARTS HERE ---
+      // Check if the response is not OK OR if the data contains an error object
+      if (!res.ok || data.error || (data.message && res.status !== 200)) {
+        console.error("Server Error:", data);
+        alert(
+          data.hint ||
+            data.details ||
+            data.message ||
+            "Failed to add discount. The code might already exist."
+        );
+        return; // Stop execution here so we don't show success alert
+      }
+      
+      setNewDiscount({
+        p_code: "",
+        p_discount_type: "percentage",
+        p_discount_value: "",
+        p_valid_from: "",
+        p_valid_until: "",
+        p_max_uses: null,
+        p_is_active: true,
+      });
       fetchAllData();
-    } else {
-      alert(data.message || data[0]?.message || "Unique code required");
+    } catch (error) {
+      console.error("Network Error:", error);
+      alert("A network error occurred.");
     }
   };
 
@@ -462,6 +520,7 @@ export function SettingsPage() {
                   <input
                     type="date"
                     className="w-full mt-1 px-3 py-2 border rounded-lg"
+                    value={newHoliday.p_date} // Add value binding
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
                       setNewHoliday({ ...newHoliday, p_date: e.target.value })
                     }
@@ -475,6 +534,7 @@ export function SettingsPage() {
                     type="text"
                     placeholder="e.g. Eid-ul-Fitr"
                     className="w-full mt-1 px-3 py-2 border rounded-lg"
+                    value={newHoliday.p_notes} // Add value binding
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
                       setNewHoliday({ ...newHoliday, p_notes: e.target.value })
                     }
@@ -544,7 +604,7 @@ export function SettingsPage() {
 
           {activeTab === "discounts" && (
             <div className="space-y-6">
-              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <div>
                   <label className="text-xs font-bold text-purple-700 uppercase">
                     Code
@@ -553,19 +613,47 @@ export function SettingsPage() {
                     type="text"
                     placeholder="PROMO20"
                     className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
+                    value={newDiscount.p_code}
                     onChange={(e) =>
                       setNewDiscount({ ...newDiscount, p_code: e.target.value })
                     }
                   />
                 </div>
+
+                {/* NEW: Discount Type Selector */}
                 <div>
                   <label className="text-xs font-bold text-purple-700 uppercase">
-                    Value (%)
+                    Type
+                  </label>
+                  <select
+                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg bg-white"
+                    value={newDiscount.p_discount_type}
+                    onChange={(e) =>
+                      setNewDiscount({
+                        ...newDiscount,
+                        p_discount_type: e.target.value as
+                          | "percentage"
+                          | "fixed",
+                      })
+                    }
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="fixed">Fixed Amount (Tk)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-purple-700 uppercase">
+                    Value{" "}
+                    {newDiscount.p_discount_type === "percentage"
+                      ? "(%)"
+                      : "(Tk)"}
                   </label>
                   <input
                     type="number"
                     placeholder="10"
                     className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
+                    value={newDiscount.p_discount_value}
                     onChange={(e) =>
                       setNewDiscount({
                         ...newDiscount,
@@ -606,7 +694,7 @@ export function SettingsPage() {
                 </div>
                 <button
                   onClick={handleAddDiscount}
-                  className="lg:col-span-4 bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-all"
+                  className="lg:col-span-5 bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-all"
                 >
                   Create Discount
                 </button>
