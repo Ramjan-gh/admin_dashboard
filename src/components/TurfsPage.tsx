@@ -83,6 +83,7 @@ export function TurfsPage() {
 
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
+    if (result.destination.index === result.source.index) return; // Add this line
 
     const items = Array.from(turfs);
     const [reorderedItem] = items.splice(result.source.index, 1);
@@ -93,8 +94,16 @@ export function TurfsPage() {
       display_order: index + 1,
     }));
 
+    // Update UI immediately
     setTurfs(updatedItems);
-    await syncOrderToDatabase(updatedItems);
+
+    // Update DB in background
+    try {
+      await syncOrderToDatabase(updatedItems);
+    } catch (err) {
+      console.error("Failed to sync order", err);
+      // Optionally: fetchTurfs() here to revert UI if DB fails
+    }
   };
 
   // --- 3. Slug-based Media Upload ---
@@ -282,29 +291,42 @@ export function TurfsPage() {
 
       {/* Turfs Grid with Drag and Drop */}
       <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="turfs-grid" direction="horizontal">
-          {(provided) => (
+        <Droppable droppableId="turfs-grid" direction="vertical">
+          {(provided, snapshot) => (
             <div
               {...provided.droppableProps}
               ref={provided.innerRef}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              // Added min-height to prevent layout collapse
+              className="flex flex-wrap gap-6 min-h-[500px]"
             >
               {turfs.map((turf, index) => (
                 <Draggable
-                  key={turf.id}
+                  key={turf.id.toString()}
                   draggableId={turf.id.toString()}
                   index={index}
                 >
-                  {(dragProvided, snapshot) => (
+                  {(dragProvided, dragSnapshot) => (
                     <div
                       ref={dragProvided.innerRef}
                       {...dragProvided.draggableProps}
-                      className={`bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all group ${
-                        snapshot.isDragging
+                      // Move dragHandleProps to the specific grip icon only
+                      style={{
+                        ...dragProvided.draggableProps.style,
+                        // Prevents weird "jumping" during drag
+                        transform: dragProvided.draggableProps.style?.transform,
+                      }}
+                      className={`bg-white w-96 rounded-2xl overflow-hidden border border-gray-200 shadow-sm transition-shadow ${
+                        dragSnapshot.isDragging
                           ? "shadow-2xl ring-2 ring-blue-500 z-50"
                           : ""
                       }`}
                     >
+                      <div
+                        {...dragProvided.dragHandleProps} // Ensure this is only on the handle
+                        className="absolute top-3 right-3 z-10 p-2 bg-white/90 rounded-lg cursor-grab active:cursor-grabbing"
+                      >
+                        <GripVertical className="w-5 h-5 text-gray-500" />
+                      </div>
                       {/* Image Header Area */}
                       <div className="relative h-48 bg-gray-200">
                         {/* Drag Handle */}

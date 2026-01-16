@@ -1,341 +1,637 @@
-import { useState } from 'react';
-import { Save, Building, Clock, Calendar, Tag, Bell, Mail, Users, Shield } from 'lucide-react';
+import { useState, useEffect, useCallback, ChangeEvent } from "react";
+import {
+  Save,
+  Building,
+  Calendar,
+  Tag,
+  Plus,
+  Trash2,
+  MapPin,
+  Globe, // <--- Add this
+  Instagram,
+  Facebook,
+  MessageCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
+
+// --- Types & Interfaces ---
+interface Organization {
+  name: string;
+  description: string;
+  logo_url: string;
+  emails: string | string[];
+  phone_numbers: string | string[];
+  address_text: string;
+  address_google_maps_url: string;
+  facebook_url: string;
+  instagram_url: string;
+  tiktok_url: string;
+  whatsapp_url: string;
+}
+
+interface Holiday {
+  id: string;
+  date: string;
+  notes: string;
+  is_open: boolean;
+}
+
+interface Discount {
+  id: string;
+  code: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+}
+
+const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState("general");
+  const [hasChanges, setHasChanges] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const tabs = [
-    { id: 'general', label: 'General', icon: Building },
-    { id: 'hours', label: 'Operating Hours', icon: Clock },
-    { id: 'holidays', label: 'Holidays', icon: Calendar },
-    { id: 'discounts', label: 'Discounts', icon: Tag },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'staff', label: 'Staff & Roles', icon: Users },
-  ];
+  // Data States with proper types
+  const [orgData, setOrgData] = useState<Organization | null>(null);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
+
+  // Form States
+  const [newHoliday, setNewHoliday] = useState({
+    p_date: "",
+    p_is_open: false,
+    p_notes: "",
+  });
+  const [newDiscount, setNewDiscount] = useState({
+    p_code: "",
+    p_discount_type: "percentage",
+    p_discount_value: "",
+    p_valid_from: null as string | null, 
+    p_valid_until: null as string | null, 
+    p_max_uses: null as number | null,
+    p_is_active: true,
+  });
+
+  const getHeaders = useCallback(
+    () => ({
+      "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    }),
+    []
+  );
+
+  const fetchAllData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = getHeaders();
+      const [orgRes, scheduleRes, discountRes] = await Promise.all([
+        fetch(`${BASE_URL}/rest/v1/rpc/get_organization`, { headers }).then(
+          (res) => res.json()
+        ),
+        fetch(`${BASE_URL}/rest/v1/rpc/get_business_schedule`, {
+          headers,
+        }).then((res) => res.json()),
+        fetch(`${BASE_URL}/rest/v1/rpc/get_discount_codes`, { headers }).then(
+          (res) => res.json()
+        ),
+      ]);
+
+      if (orgRes && orgRes[0]) setOrgData(orgRes[0]);
+      if (Array.isArray(scheduleRes)) setHolidays(scheduleRes);
+      if (Array.isArray(discountRes)) setDiscounts(discountRes);
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getHeaders]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
+  const handleUpdateOrg = async () => {
+    if (!orgData) return; // Fixes "possibly null" error
+
+    try {
+      const response = await fetch(
+        `${BASE_URL}/rest/v1/rpc/update_organization`,
+        {
+          method: "POST",
+          headers: getHeaders(),
+          body: JSON.stringify({
+            p_name: orgData.name,
+            p_description: orgData.description,
+            p_logo_url: orgData.logo_url,
+            p_emails: Array.isArray(orgData.emails)
+              ? orgData.emails
+              : orgData.emails.split(",").map((e) => e.trim()),
+            p_phone_numbers: Array.isArray(orgData.phone_numbers)
+              ? orgData.phone_numbers
+              : orgData.phone_numbers.split(",").map((p) => p.trim()),
+            p_address_text: orgData.address_text,
+            p_address_google_maps_url: orgData.address_google_maps_url,
+            p_facebook_url: orgData.facebook_url,
+            p_instagram_url: orgData.instagram_url,
+            p_tiktok_url: orgData.tiktok_url,
+            p_whatsapp_url: orgData.whatsapp_url,
+          }),
+        }
+      );
+      if (response.ok) {
+        setHasChanges(false);
+        alert("Organization updated successfully");
+        fetchAllData();
+      }
+    } catch (error) {
+      alert("Failed to update organization");
+    }
+  };
+
+  const handleAddSchedule = async () => {
+    if (!newHoliday.p_date) return alert("Date is required");
+    const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_business_schedule`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(newHoliday),
+    });
+    if (res.ok) fetchAllData();
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!window.confirm("Delete this schedule?")) return;
+    const res = await fetch(
+      `${BASE_URL}/rest/v1/rpc/delete_business_schedule`,
+      {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ p_id: id }),
+      }
+    );
+    if (res.ok) fetchAllData();
+  };
+
+  const handleAddDiscount = async () => {
+    const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_discount`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(newDiscount),
+    });
+    const data = await res.json();
+    if (res.ok && (data[0]?.success || !data.error)) {
+      setHasChanges(false);
+      fetchAllData();
+    } else {
+      alert(data.message || data[0]?.message || "Unique code required");
+    }
+  };
+
+  if (loading)
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+      </div>
+    );
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-gray-900 mb-1">Settings</h1>
-        <p className="text-gray-500">Manage your business settings and preferences</p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-gray-900 mb-1 text-2xl font-bold">Settings</h1>
+          <p className="text-gray-500">
+            Manage your business configuration and rules
+          </p>
+        </div>
+        {hasChanges && (
+          <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1 rounded-full text-sm border border-amber-200">
+            <AlertCircle className="w-4 h-4" /> Unsaved Changes
+          </div>
+        )}
       </div>
 
-      {/* Tabs */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="border-b border-gray-200 overflow-x-auto">
+        {/* Navigation Tabs */}
+        <div className="border-b border-gray-200 overflow-x-auto bg-gray-50/50">
           <div className="flex">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 whitespace-nowrap transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-b-2 border-purple-500 text-purple-600'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+            {[
+              { id: "general", label: "General", icon: Building },
+              { id: "holidays", label: "Holidays", icon: Calendar },
+              { id: "discounts", label: "Discounts", icon: Tag },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-6 py-4 whitespace-nowrap font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "border-b-2 border-purple-500 text-purple-600 bg-white"
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <tab.icon className="w-5 h-5" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="p-6">
-          {/* General Settings */}
-          {activeTab === 'general' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-gray-900 mb-4">Business Information</h3>
-                <div className="space-y-4">
+          {/* --- GENERAL TAB --- */}
+          {activeTab === "general" && orgData && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* 1. Identity & Branding */}
+                <section className="space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                    <Building className="w-4 h-4 text-purple-600" /> Identity &
+                    Branding
+                  </h3>
+                  <div className="flex items-center gap-4 mb-4">
+                    <img
+                      src={orgData.logo_url}
+                      alt="Logo"
+                      className="w-16 h-16 rounded-lg object-cover border"
+                    />
+                    <div className="flex-1">
+                      <label className="text-sm font-medium text-gray-600">
+                        Logo URL
+                      </label>
+                      <input
+                        type="text"
+                        value={orgData.logo_url || ""}
+                        onChange={(e) => {
+                          setOrgData({ ...orgData, logo_url: e.target.value });
+                          setHasChanges(true);
+                        }}
+                        className="w-full mt-1 px-4 py-2 border rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
                   <div>
-                    <label className="block text-sm text-gray-700 mb-2">Business Name</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Business Name
+                    </label>
                     <input
                       type="text"
-                      defaultValue="TurfBook Sports Complex"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      value={orgData.name || ""}
+                      onChange={(e) => {
+                        setOrgData({ ...orgData, name: e.target.value });
+                        setHasChanges(true);
+                      }}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
                     />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">Email</label>
-                      <input
-                        type="email"
-                        defaultValue="info@turfbook.com"
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-700 mb-2">Phone</label>
-                      <input
-                        type="tel"
-                        defaultValue="+880 1XXX-XXXXXX"
-                        className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      />
-                    </div>
-                  </div>
                   <div>
-                    <label className="block text-sm text-gray-700 mb-2">Address</label>
+                    <label className="text-sm font-medium text-gray-600">
+                      Description
+                    </label>
                     <textarea
                       rows={3}
-                      defaultValue="Dhaka, Bangladesh"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      value={orgData.description || ""}
+                      onChange={(e) => {
+                        setOrgData({ ...orgData, description: e.target.value });
+                        setHasChanges(true);
+                      }}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                    />
+                  </div>
+                </section>
+
+                {/* 2. Contact Information */}
+                <section className="space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                    <Globe className="w-4 h-4 text-purple-600" /> Contact Info
+                  </h3>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">
+                      Emails (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        Array.isArray(orgData.emails)
+                          ? orgData.emails.join(", ")
+                          : orgData.emails
+                      }
+                      onChange={(e) => {
+                        setOrgData({ ...orgData, emails: e.target.value });
+                        setHasChanges(true);
+                      }}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-700 mb-2">Description</label>
-                    <textarea
-                      rows={4}
-                      defaultValue="Premium sports facility offering multiple turfs for Football, Cricket, and Badminton."
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                </div>
-              </div>
-              <button className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-shadow">
-                <Save className="w-5 h-5" />
-                <span>Save Changes</span>
-              </button>
-            </div>
-          )}
-
-          {/* Operating Hours */}
-          {activeTab === 'hours' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-gray-900 mb-4">Operating Hours</h3>
-                <div className="space-y-3">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                    <div key={day} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="w-32">
-                        <span className="text-gray-900">{day}</span>
-                      </div>
-                      <div className="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">Opening</label>
-                          <input
-                            type="time"
-                            defaultValue="06:00"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">Closing</label>
-                          <input
-                            type="time"
-                            defaultValue="23:00"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                          />
-                        </div>
-                      </div>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" defaultChecked className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm text-gray-600">Open</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-shadow">
-                <Save className="w-5 h-5" />
-                <span>Save Changes</span>
-              </button>
-            </div>
-          )}
-
-          {/* Holidays */}
-          {activeTab === 'holidays' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-gray-900 mb-4">Manage Holidays</h3>
-                <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <input
-                      type="date"
-                      className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
+                    <label className="text-sm font-medium text-gray-600">
+                      Phone Numbers
+                    </label>
                     <input
                       type="text"
-                      placeholder="Holiday name"
-                      className="flex-1 px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      value={
+                        Array.isArray(orgData.phone_numbers)
+                          ? orgData.phone_numbers.join(", ")
+                          : orgData.phone_numbers
+                      }
+                      onChange={(e) => {
+                        setOrgData({
+                          ...orgData,
+                          phone_numbers: e.target.value,
+                        });
+                        setHasChanges(true);
+                      }}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg"
                     />
-                    <button className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-shadow">
-                      Add
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">
+                      Physical Address
+                    </label>
+                    <input
+                      type="text"
+                      value={orgData.address_text || ""}
+                      onChange={(e) => {
+                        setOrgData({
+                          ...orgData,
+                          address_text: e.target.value,
+                        });
+                        setHasChanges(true);
+                      }}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg"
+                    />
+                  </div>
+                </section>
+
+                {/* 3. Social Media Links */}
+                <section className="space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                    <Instagram className="w-4 h-4 text-purple-600" /> Social
+                    Presence
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex items-center gap-2">
+                      <Facebook className="w-5 h-5 text-blue-600" />
+                      <input
+                        placeholder="Facebook URL"
+                        value={orgData.facebook_url || ""}
+                        onChange={(e) => {
+                          setOrgData({
+                            ...orgData,
+                            facebook_url: e.target.value,
+                          });
+                          setHasChanges(true);
+                        }}
+                        className="flex-1 px-4 py-2 border rounded-lg text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Instagram className="w-5 h-5 text-pink-600" />
+                      <input
+                        placeholder="Instagram URL"
+                        value={orgData.instagram_url || ""}
+                        onChange={(e) => {
+                          setOrgData({
+                            ...orgData,
+                            instagram_url: e.target.value,
+                          });
+                          setHasChanges(true);
+                        }}
+                        className="flex-1 px-4 py-2 border rounded-lg text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="w-5 h-5 text-green-600" />
+                      <input
+                        placeholder="WhatsApp URL"
+                        value={orgData.whatsapp_url || ""}
+                        onChange={(e) => {
+                          setOrgData({
+                            ...orgData,
+                            whatsapp_url: e.target.value,
+                          });
+                          setHasChanges(true);
+                        }}
+                        className="flex-1 px-4 py-2 border rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* 4. Location Details */}
+                <section className="space-y-4">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                    <MapPin className="w-4 h-4 text-purple-600" /> Map
+                    Integration
+                  </h3>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">
+                      Google Maps URL
+                    </label>
+                    <input
+                      type="url"
+                      value={orgData.address_google_maps_url || ""}
+                      onChange={(e) => {
+                        setOrgData({
+                          ...orgData,
+                          address_google_maps_url: e.target.value,
+                        });
+                        setHasChanges(true);
+                      }}
+                      className="w-full mt-1 px-4 py-2 border rounded-lg text-blue-600"
+                    />
+                  </div>
+                </section>
+              </div>
+
+              <div className="pt-6 border-t">
+                <button
+                  onClick={handleUpdateOrg}
+                  className="flex items-center gap-2 px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-md transition-all font-bold"
+                >
+                  <Save className="w-5 h-5" /> Save All Settings
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "holidays" && (
+            <div className="space-y-6">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg"
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setNewHoliday({ ...newHoliday, p_date: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">
+                    Note
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Eid-ul-Fitr"
+                    className="w-full mt-1 px-3 py-2 border rounded-lg"
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setNewHoliday({ ...newHoliday, p_notes: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="flex items-center h-10">
+                  <input
+                    type="checkbox"
+                    id="isOpen"
+                    className="w-4 h-4 accent-purple-600"
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setNewHoliday({
+                        ...newHoliday,
+                        p_is_open: e.target.checked,
+                      })
+                    }
+                  />
+                  <label
+                    htmlFor="isOpen"
+                    className="ml-2 text-sm text-gray-700"
+                  >
+                    Open?
+                  </label>
+                </div>
+                <button
+                  onClick={handleAddSchedule}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-purple-700"
+                >
+                  <Plus className="w-4 h-4" /> Add
+                </button>
+              </div>
+
+              <div className="divide-y border rounded-xl">
+                {holidays.map((h) => (
+                  <div
+                    key={h.id}
+                    className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {h.notes || "No Title"}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {h.date} •{" "}
+                        <span
+                          className={
+                            h.is_open
+                              ? "text-green-600"
+                              : "text-red-600 font-medium"
+                          }
+                        >
+                          {h.is_open ? "Open" : "Closed"}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSchedule(h.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
-                  <div className="space-y-2">
-                    {[
-                      { date: '2025-12-25', name: 'Christmas Day' },
-                      { date: '2025-12-31', name: 'New Year\'s Eve' },
-                      { date: '2026-01-01', name: 'New Year\'s Day' },
-                    ].map((holiday, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="text-gray-900">{holiday.name}</p>
-                          <p className="text-sm text-gray-500">{holiday.date}</p>
-                        </div>
-                        <button className="text-red-600 hover:text-red-800 text-sm">Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Discounts */}
-          {activeTab === 'discounts' && (
+          {activeTab === "discounts" && (
             <div className="space-y-6">
-              <div>
-                <h3 className="text-gray-900 mb-4">Discount Codes</h3>
-                <button className="mb-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-shadow">
-                  Create New Discount
+              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                <div>
+                  <label className="text-xs font-bold text-purple-700 uppercase">
+                    Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="PROMO20"
+                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
+                    onChange={(e) =>
+                      setNewDiscount({ ...newDiscount, p_code: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-purple-700 uppercase">
+                    Value (%)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="10"
+                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
+                    onChange={(e) =>
+                      setNewDiscount({
+                        ...newDiscount,
+                        p_discount_value: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-purple-700 uppercase">
+                    Valid From
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
+                    onChange={(e) =>
+                      setNewDiscount({
+                        ...newDiscount,
+                        p_valid_from: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-purple-700 uppercase">
+                    Valid Until
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
+                    onChange={(e) =>
+                      setNewDiscount({
+                        ...newDiscount,
+                        p_valid_until: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <button
+                  onClick={handleAddDiscount}
+                  className="lg:col-span-4 bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-all"
+                >
+                  Create Discount
                 </button>
-                <div className="space-y-3">
-                  {[
-                    { code: 'FIRST10', discount: '10%', type: 'First Booking', status: 'active' },
-                    { code: 'WEEKEND20', discount: '20%', type: 'Weekend Special', status: 'active' },
-                    { code: 'GROUP15', discount: '15%', type: 'Group Booking', status: 'active' },
-                  ].map((discount, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="text-purple-600">{discount.code}</span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            discount.status === 'active'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {discount.status}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600">{discount.type} • {discount.discount} off</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
-                        <button className="text-red-600 hover:text-red-800 text-sm">Delete</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </div>
-          )}
 
-          {/* Notifications */}
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-gray-900 mb-4">Notification Preferences</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Bell className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-gray-900">New Booking Notifications</p>
-                        <p className="text-sm text-gray-500">Receive alerts for new bookings</p>
-                      </div>
+              <div className="grid grid-cols-1 gap-4">
+                {discounts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="border rounded-xl p-4 flex justify-between items-center bg-white shadow-sm"
+                  >
+                    <div>
+                      <span className="font-mono text-lg font-bold text-purple-800">
+                        {d.code}
+                      </span>
+                      <p className="text-sm text-gray-600">
+                        {d.discount_value}{" "}
+                        {d.discount_type === "percentage" ? "%" : "Tk"} Off
+                      </p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" defaultChecked className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+                    <button className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-lg">
+                      Delete
+                    </button>
                   </div>
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Mail className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-gray-900">Email Notifications</p>
-                        <p className="text-sm text-gray-500">Send email notifications to customers</p>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" defaultChecked className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Bell className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-gray-900">SMS Notifications</p>
-                        <p className="text-sm text-gray-500">Send SMS reminders to customers</p>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" defaultChecked className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Bell className="w-5 h-5 text-gray-400" />
-                      <div>
-                        <p className="text-gray-900">Payment Alerts</p>
-                        <p className="text-sm text-gray-500">Get notified about pending payments</p>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" defaultChecked className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <button className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-shadow">
-                <Save className="w-5 h-5" />
-                <span>Save Changes</span>
-              </button>
-            </div>
-          )}
-
-          {/* Staff & Roles */}
-          {activeTab === 'staff' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-gray-900 mb-4">Staff Management</h3>
-                <button className="mb-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg transition-shadow">
-                  Add New Staff
-                </button>
-                <div className="space-y-3">
-                  {[
-                    { name: 'Super Admin', email: 'admin@turfbook.com', role: 'Super Admin', status: 'active' },
-                    { name: 'Manager One', email: 'manager@turfbook.com', role: 'Manager', status: 'active' },
-                    { name: 'Cashier One', email: 'cashier@turfbook.com', role: 'Cashier', status: 'active' },
-                  ].map((staff, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center">
-                          <span className="text-white text-sm">{staff.name[0]}</span>
-                        </div>
-                        <div>
-                          <p className="text-gray-900">{staff.name}</p>
-                          <p className="text-sm text-gray-500">{staff.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm px-3 py-1 bg-purple-100 text-purple-700 rounded-full">
-                          {staff.role}
-                        </span>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          staff.status === 'active'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {staff.status}
-                        </span>
-                        <button className="text-blue-600 hover:text-blue-800 text-sm">Edit</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
             </div>
           )}
