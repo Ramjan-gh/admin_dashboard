@@ -44,6 +44,14 @@ interface Discount {
   discount_value: number;
 }
 
+interface Discount {
+  id: string;
+  code: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  is_active: boolean; // Ensure this is in your interface
+}
+
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 export function SettingsPage() {
@@ -198,7 +206,7 @@ export function SettingsPage() {
   };
 
   const handleAddDiscount = async () => {
-    // 1. Client-side Null/Empty Validation
+    // 1. Client-side Validation
     if (!newDiscount.p_code.trim()) return alert("Discount code is required");
     if (!newDiscount.p_discount_value)
       return alert("Discount value is required");
@@ -216,19 +224,24 @@ export function SettingsPage() {
 
       const data = await res.json();
 
-      // --- KEY FIX STARTS HERE ---
-      // Check if the response is not OK OR if the data contains an error object
-      if (!res.ok || data.error || (data.message && res.status !== 200)) {
-        console.error("Server Error:", data);
+      // --- UPDATED FIX STARTS HERE ---
+      // Since the API returns an array like [{ success: false, message: "..." }]
+      // We extract the first item from the array safely.
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!res.ok || result?.success === false) {
+        console.error("Server Error:", result);
         alert(
-          data.hint ||
-            data.details ||
-            data.message ||
-            "Failed to add discount. The code might already exist."
+          result?.message ||
+            result?.details ||
+            "Failed to add discount. The code might already exist.",
         );
-        return; // Stop execution here so we don't show success alert
+        return; // Stop execution
       }
-      
+      // --- UPDATED FIX ENDS HERE ---
+
+      // Success Path
+      alert("Discount added successfully!");
       setNewDiscount({
         p_code: "",
         p_discount_type: "percentage",
@@ -241,6 +254,60 @@ export function SettingsPage() {
       fetchAllData();
     } catch (error) {
       console.error("Network Error:", error);
+      alert("A network error occurred.");
+    }
+  };
+
+  const handleDeleteDiscount = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this discount code?"))
+      return;
+
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_discount`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ p_id: id }),
+      });
+
+      const data = await res.json();
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!res.ok || result?.success === false) {
+        alert(result?.message || "Failed to delete discount.");
+        return;
+      }
+
+      alert("Discount deleted successfully");
+      fetchAllData();
+    } catch (error) {
+      alert("A network error occurred.");
+    }
+  };
+
+  const handleToggleDiscountStatus = async (
+    id: string,
+    currentStatus: boolean,
+  ) => {
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_discount`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({
+          p_id: id,
+          p_is_active: !currentStatus,
+        }),
+      });
+
+      const data = await res.json();
+      const result = Array.isArray(data) ? data[0] : data;
+
+      if (!res.ok || result?.success === false) {
+        alert(result?.message || "Failed to update discount.");
+        return;
+      }
+
+      fetchAllData();
+    } catch (error) {
       alert("A network error occurred.");
     }
   };
@@ -706,18 +773,47 @@ export function SettingsPage() {
                     key={d.id}
                     className="border rounded-xl p-4 flex justify-between items-center bg-white shadow-sm"
                   >
-                    <div>
-                      <span className="font-mono text-lg font-bold text-purple-800">
-                        {d.code}
-                      </span>
-                      <p className="text-sm text-gray-600">
-                        {d.discount_value}{" "}
-                        {d.discount_type === "percentage" ? "%" : "Tk"} Off
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`w-2 h-2 rounded-full ${d.is_active ? "bg-green-500" : "bg-gray-300"}`}
+                      />
+                      <div>
+                        <span className="font-mono text-lg font-bold text-purple-800">
+                          {d.code}
+                        </span>
+                        <p className="text-sm text-gray-600">
+                          {d.discount_value}{" "}
+                          {d.discount_type === "percentage" ? "%" : "Tk"} Off
+                          <span className="ml-2 px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-gray-100">
+                            {d.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </p>
+                      </div>
                     </div>
-                    <button className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-lg">
-                      Delete
-                    </button>
+
+                    <div className="flex gap-2">
+                      {/* Update Button (Toggle Status) */}
+                      <button
+                        onClick={() =>
+                          handleToggleDiscountStatus(d.id, d.is_active)
+                        }
+                        className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors ${
+                          d.is_active
+                            ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                            : "bg-green-50 text-green-600 hover:bg-green-100"
+                        }`}
+                      >
+                        {d.is_active ? "Deactivate" : "Activate"}
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => handleDeleteDiscount(d.id)}
+                        className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

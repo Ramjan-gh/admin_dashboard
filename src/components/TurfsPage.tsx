@@ -110,11 +110,7 @@ export function TurfsPage() {
   const handleFileUpload = async (file: File, type: "bg" | "icon") => {
     setUploading(type);
 
-    // 1. Try to get the latest token
-    // If you are using Supabase Auth, the key is usually 'sb-[project-id]-auth-token'
-    // but many developers manually save it as 'sb-access-token'
     const accessToken = localStorage.getItem("sb-access-token");
-
     if (!accessToken) {
       alert("You must be logged in to upload images.");
       setUploading(null);
@@ -122,6 +118,32 @@ export function TurfsPage() {
     }
 
     const folder = type === "bg" ? "field_background_images" : "field_icons";
+
+    // --- NEW: Delete Old File Logic ---
+    const oldUrl =
+      type === "bg" ? formData.background_image_url : formData.icon_url;
+    if (oldUrl && oldUrl.includes(BASE_URL)) {
+      try {
+        // Extract the filename from the URL
+        const urlParts = oldUrl.split("/");
+        const oldFileName = urlParts[urlParts.length - 1];
+        const deleteUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${oldFileName}`;
+
+        await fetch(deleteUrl, {
+          method: "DELETE",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        // We don't necessarily need to wait/block if delete fails,
+        // but it's good practice to try.
+      } catch (err) {
+        console.error("Failed to delete old image:", err);
+      }
+    }
+    // ----------------------------------
+
     const fileExt = file.name.split(".").pop();
     const slug = (formData.name || "field")
       .toLowerCase()
@@ -150,20 +172,14 @@ export function TurfsPage() {
           [type === "bg" ? "background_image_url" : "icon_url"]: publicUrl,
         }));
       } else {
-        // IF TOKEN EXPIRED
         if (result.message?.includes("exp") || result.statusCode === "403") {
-          alert(
-            "Your session has expired. Please log out and log back in to upload images."
-          );
+          alert("Your session has expired. Please log in again.");
         } else {
           alert(`Upload failed: ${result.message}`);
         }
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert(
-        "Check your internet connection or console for storage RLS policies."
-      );
     } finally {
       setUploading(null);
     }
