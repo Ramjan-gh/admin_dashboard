@@ -319,6 +319,85 @@ export function SettingsPage() {
       </div>
     );
 
+    const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !orgData) return;
+
+      // 1. Get the session token (matching your working pattern)
+      const accessToken = localStorage.getItem("sb-access-token");
+      if (!accessToken) {
+        alert("You must be logged in to upload images.");
+        return;
+      }
+
+      setLoading(true);
+
+      // 2. Setup paths
+      const folder = "logo";
+      const fileExt = file.name.split(".").pop();
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+      const uploadUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${fileName}`;
+
+      try {
+        // 3. Delete Old File Logic
+        if (orgData.logo_url && orgData.logo_url.includes(BASE_URL)) {
+          try {
+            const urlParts = orgData.logo_url.split("/");
+            const oldFileName = urlParts[urlParts.length - 1];
+            const deleteUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${oldFileName}`;
+
+            await fetch(deleteUrl, {
+              method: "DELETE",
+              headers: {
+                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+            console.log("Old logo cleaned up");
+          } catch (err) {
+            console.error("Failed to delete old image:", err);
+          }
+        }
+
+        // 4. Upload New File
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": file.type,
+            "x-upsert": "true",
+          },
+          body: file,
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          const publicUrl = `${BASE_URL}/storage/v1/object/public/media/${folder}/${fileName}`;
+
+          // Update local state
+          setOrgData((prev) =>
+            prev ? { ...prev, logo_url: publicUrl } : null,
+          );
+          setHasChanges(true);
+
+          console.log("Upload successful:", publicUrl);
+        } else {
+          if (result.message?.includes("exp") || result.statusCode === "403") {
+            alert("Your session has expired. Please log in again.");
+          } else {
+            alert(`Upload failed: ${result.message}`);
+          }
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+        alert("An error occurred during upload.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
   return (
     <div className="p-4 lg:p-6 space-y-6">
       <div className="flex justify-between items-end">
@@ -371,27 +450,34 @@ export function SettingsPage() {
                     <Building className="w-4 h-4 text-purple-600" /> Identity &
                     Branding
                   </h3>
-                  <div className="flex items-center gap-4 mb-4">
-                    <img
-                      src={orgData.logo_url}
-                      alt="Logo"
-                      className="w-16 h-16 rounded-lg object-cover border"
-                    />
-                    <div className="flex-1">
-                      <label className="text-sm font-medium text-gray-600">
-                        Logo URL
-                      </label>
-                      <input
-                        type="text"
-                        value={orgData.logo_url || ""}
-                        onChange={(e) => {
-                          setOrgData({ ...orgData, logo_url: e.target.value });
-                          setHasChanges(true);
-                        }}
-                        className="w-full mt-1 px-4 py-2 border rounded-lg text-xs"
+
+                  <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                    <div className="relative group">
+                      <img
+                        src={orgData.logo_url}
+                        alt="Logo"
+                        className="w-24 h-24 rounded-lg object-cover border-2 border-white shadow-md"
                       />
+                      <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white opacity-0 group-hover:opacity-100 rounded-lg cursor-pointer transition-opacity">
+                        {loading ? (
+                          <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                        ) : (
+                          <Plus className="w-6 h-6" />
+                        )}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          disabled={loading}
+                        />
+                      </label>
                     </div>
+                    <p className="text-[10px] text-gray-400 mt-2 uppercase font-bold tracking-wider">
+                      Click image to change logo
+                    </p>
                   </div>
+
                   <div>
                     <label className="text-sm font-medium text-gray-600">
                       Business Name
@@ -406,6 +492,7 @@ export function SettingsPage() {
                       className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
                     />
                   </div>
+
                   <div>
                     <label className="text-sm font-medium text-gray-600">
                       Description
@@ -670,152 +757,195 @@ export function SettingsPage() {
           )}
 
           {activeTab === "discounts" && (
-            <div className="space-y-6">
-              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                <div>
-                  <label className="text-xs font-bold text-purple-700 uppercase">
-                    Code
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="PROMO20"
-                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
-                    value={newDiscount.p_code}
-                    onChange={(e) =>
-                      setNewDiscount({ ...newDiscount, p_code: e.target.value })
-                    }
-                  />
-                </div>
+            <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+              {/* TOP SECTION: Create Discount Form (Stay fixed at top) */}
+              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 shadow-sm">
+                <h3 className="text-sm font-bold text-purple-800 mb-4 uppercase tracking-wider">
+                  Create New Discount
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                  <div>
+                    <label className="text-[10px] font-bold text-purple-700 uppercase">
+                      Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="PROMO20"
+                      className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-400 outline-none uppercase font-mono"
+                      value={newDiscount.p_code}
+                      onChange={(e) =>
+                        setNewDiscount({
+                          ...newDiscount,
+                          p_code: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
 
-                {/* NEW: Discount Type Selector */}
-                <div>
-                  <label className="text-xs font-bold text-purple-700 uppercase">
-                    Type
-                  </label>
-                  <select
-                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg bg-white"
-                    value={newDiscount.p_discount_type}
-                    onChange={(e) =>
-                      setNewDiscount({
-                        ...newDiscount,
-                        p_discount_type: e.target.value as
-                          | "percentage"
-                          | "fixed",
-                      })
-                    }
-                  >
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed Amount (Tk)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-purple-700 uppercase">
-                    Value{" "}
-                    {newDiscount.p_discount_type === "percentage"
-                      ? "(%)"
-                      : "(Tk)"}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="10"
-                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
-                    value={newDiscount.p_discount_value}
-                    onChange={(e) =>
-                      setNewDiscount({
-                        ...newDiscount,
-                        p_discount_value: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-purple-700 uppercase">
-                    Valid From
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
-                    onChange={(e) =>
-                      setNewDiscount({
-                        ...newDiscount,
-                        p_valid_from: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-purple-700 uppercase">
-                    Valid Until
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg"
-                    onChange={(e) =>
-                      setNewDiscount({
-                        ...newDiscount,
-                        p_valid_until: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <button
-                  onClick={handleAddDiscount}
-                  className="lg:col-span-5 bg-purple-600 text-white py-3 rounded-lg font-bold hover:bg-purple-700 transition-all"
-                >
-                  Create Discount
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {discounts.map((d) => (
-                  <div
-                    key={d.id}
-                    className="border rounded-xl p-4 flex justify-between items-center bg-white shadow-sm"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`w-2 h-2 rounded-full ${d.is_active ? "bg-green-500" : "bg-gray-300"}`}
-                      />
-                      <div>
-                        <span className="font-mono text-lg font-bold text-purple-800">
-                          {d.code}
-                        </span>
-                        <p className="text-sm text-gray-600">
-                          {d.discount_value}{" "}
-                          {d.discount_type === "percentage" ? "%" : "Tk"} Off
-                          <span className="ml-2 px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-gray-100">
-                            {d.is_active ? "Active" : "Inactive"}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {/* Update Button (Toggle Status) */}
+                  <div>
+                    <label className="text-[10px] font-bold text-purple-700 uppercase">
+                      Type
+                    </label>
+                    <div className="flex mt-1 p-1 bg-purple-100 rounded-lg h-[42px]">
                       <button
+                        type="button"
                         onClick={() =>
-                          handleToggleDiscountStatus(d.id, d.is_active)
+                          setNewDiscount({
+                            ...newDiscount,
+                            p_discount_type: "percentage",
+                          })
                         }
-                        className={`text-xs px-3 py-2 rounded-lg font-medium transition-colors ${
-                          d.is_active
-                            ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                            : "bg-green-50 text-green-600 hover:bg-green-100"
-                        }`}
+                        className={`flex-1 px-2 rounded-md text-xs font-bold transition-all ${newDiscount.p_discount_type === "percentage" ? "bg-white text-purple-700 shadow-sm" : "text-purple-500"}`}
                       >
-                        {d.is_active ? "Deactivate" : "Activate"}
+                        %
                       </button>
-
-                      {/* Delete Button */}
                       <button
-                        onClick={() => handleDeleteDiscount(d.id)}
-                        className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors"
+                        type="button"
+                        onClick={() =>
+                          setNewDiscount({
+                            ...newDiscount,
+                            p_discount_type: "fixed",
+                          })
+                        }
+                        className={`flex-1 px-2 rounded-md text-xs font-bold transition-all ${newDiscount.p_discount_type === "fixed" ? "bg-white text-purple-700 shadow-sm" : "text-purple-500"}`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        Tk
                       </button>
                     </div>
                   </div>
-                ))}
+
+                  <div>
+                    <label className="text-[10px] font-bold text-purple-700 uppercase">
+                      Value
+                    </label>
+                    <input
+                      type="number"
+                      className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-400"
+                      value={newDiscount.p_discount_value}
+                      onChange={(e) =>
+                        setNewDiscount({
+                          ...newDiscount,
+                          p_discount_value: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-purple-700 uppercase">
+                      Valid From
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg text-sm"
+                      value={newDiscount.p_valid_from}
+                      onChange={(e) =>
+                        setNewDiscount({
+                          ...newDiscount,
+                          p_valid_from: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-purple-700 uppercase">
+                      Valid Until
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full mt-1 px-3 py-2 border border-purple-200 rounded-lg text-sm"
+                      value={newDiscount.p_valid_until}
+                      onChange={(e) =>
+                        setNewDiscount({
+                          ...newDiscount,
+                          p_valid_until: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleAddDiscount}
+                    className="bg-purple-600 text-white h-[42px] rounded-lg font-bold hover:bg-purple-700 transition-all shadow-md shadow-purple-200"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+
+              {/* BOTTOM SECTION: Scrollable List */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center px-2">
+                  <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+                    Active Coupons
+                  </h3>
+                  <span className="text-[10px] bg-gray-100 px-2 py-1 rounded-full font-bold text-gray-400">
+                    {discounts.length} CODES TOTAL
+                  </span>
+                </div>
+
+                {/* Scrollable Container */}
+                <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {discounts.length === 0 ? (
+                      <div className="lg:col-span-2 text-center py-10 bg-gray-50 rounded-xl border-2 border-dashed">
+                        <p className="text-gray-400 font-medium">
+                          No discount codes available.
+                        </p>
+                      </div>
+                    ) : (
+                      discounts.map((d) => (
+                        <div
+                          key={d.id}
+                          className="border border-gray-100 rounded-xl p-4 flex justify-between items-center bg-white shadow-sm hover:border-purple-200 transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`w-2 h-2 rounded-full ${d.is_active ? "bg-green-500 animate-pulse" : "bg-gray-300"}`}
+                            />
+                            <div>
+                              <span className="font-mono text-lg font-black text-purple-900 tracking-tighter uppercase">
+                                {d.code}
+                              </span>
+                              <p className="text-xs text-gray-500 font-medium">
+                                {d.discount_value}{" "}
+                                {d.discount_type === "percentage" ? "%" : "Tk"}{" "}
+                                Off
+                                <span
+                                  className={`ml-2 px-1.5 py-0.5 rounded text-[9px] uppercase font-bold ${d.is_active ? "bg-green-50 text-green-600" : "bg-gray-50 text-gray-400"}`}
+                                >
+                                  {d.is_active ? "Active" : "Paused"}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() =>
+                                handleToggleDiscountStatus(d.id, d.is_active)
+                              }
+                              className={`text-[10px] px-3 py-1.5 rounded-lg font-bold uppercase transition-colors ${
+                                d.is_active
+                                  ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                  : "bg-green-50 text-green-600 hover:bg-green-100"
+                              }`}
+                            >
+                              {d.is_active ? "Pause" : "Live"}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDiscount(d.id)}
+                              className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
