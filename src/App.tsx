@@ -14,6 +14,7 @@ import { SlotsPage } from "./components/SlotsPage";
 import { TurfsPage } from "./components/TurfsPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
+import { Toaster } from "sonner";
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -34,6 +35,7 @@ export default function App() {
 
   return (
     <Router>
+      <Toaster position="top-right" richColors closeButton />
       <Routes>
         {/* Public Route */}
         <Route

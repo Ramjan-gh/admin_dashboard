@@ -67,3 +67,34 @@ export type ApiItem = {
     };
   };
 };
+
+// types.ts
+
+export interface Organization {
+  name: string;
+  description: string;
+  logo_url: string;
+  emails: string | string[];
+  phone_numbers: string | string[];
+  address_text: string;
+  address_google_maps_url: string;
+  facebook_url: string;
+  instagram_url: string;
+  tiktok_url: string;
+  whatsapp_url: string;
+}
+
+export interface Holiday {
+  id: string;
+  date: string;
+  notes: string;
+  is_open: boolean;
+}
+
+export interface Discount {
+  id: string;
+  code: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  is_active: boolean;
+}
