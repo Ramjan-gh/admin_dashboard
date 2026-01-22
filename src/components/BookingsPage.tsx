@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Booking, BookingDetails, ApiItem } from "./types";
-import { BookingFilters } from "./BookingFilters";
-import { BookingsTable } from "./BookingsTable";
-import { BookingDetailsDrawer } from "./BookingDetailsDrawer";
+import { BookingFilters } from "./bookingsPageFolder/BookingFilters";
+import { BookingsTable } from "./bookingsPageFolder/BookingsTable";
+import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 

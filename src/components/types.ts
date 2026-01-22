@@ -1,3 +1,18 @@
+import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer";
+import { BookingFilters } from "./bookingsPageFolder/BookingFilters";
+import { BookingsTable } from "./bookingsPageFolder/BookingsTable";
+import { LoginPage } from "./LoginPage";
+import { BannerSettings } from "./settingsPageFolder/BannerSettings";
+import { DiscountSettings } from "./settingsPageFolder/DiscountSettings";
+import { GeneralSettings } from "./settingsPageFolder/GeneralSettings";
+import { HolidaySettings } from "./settingsPageFolder/HolidaySettings";
+import { Sidebar } from "./Sidebar";
+import { SlotsPage } from "./SlotsPage";
+import { AddShiftModal } from "./slotsPageFolder/AddShiftModal";
+import { AddSlotModal } from "./slotsPageFolder/AddSlotModal";
+import { FilterBar } from "./slotsPageFolder/FilterBar";
+
+// BookingsPage.tsx types
 export type Booking = {
   id: string;
   bookingCode: string;
@@ -68,7 +83,8 @@ export type ApiItem = {
   };
 };
 
-// types.ts
+
+// SeetingsPage.tsx types
 
 export interface Organization {
   name: string;
@@ -97,4 +113,188 @@ export interface Discount {
   discount_type: "percentage" | "fixed";
   discount_value: number;
   is_active: boolean;
+}
+
+// UpdateShiftModal.tsx types 
+
+export type UpdateShiftModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onUpdate: (data: any) => void;
+  shift: { id: string; name: string } | null;
+  loading: boolean;
+};
+
+// useSlots.ts types 
+export type Field = { id: string; name: string; icon_url: string };
+export type Slot = {
+  shift_id: string;
+  slot_id: string;
+  field_id: string;
+  start_time: string;
+  end_time: string;
+  price: number;
+  type: string;
+  status: "available" | "booked" | "maintenance";
+  booking_code: string | null;
+  full_name: string | null;
+};
+export type Shift = { shift_id: string; shift_name: string };
+
+// BookingDetailsDrawer.tsx types
+export interface DrawerProps {
+  details: BookingDetails | null;
+  loading: boolean;
+  onClose: () => void;
+}
+
+// BookingFilters.tsx types 
+export interface FilterProps {
+  search: string;
+  setSearch: (val: string) => void;
+  bookingDate: string;
+  setBookingDate: (val: string) => void;
+  fieldFilter: string;
+  setFieldFilter: (val: string) => void;
+  paymentStatus: string;
+  setPaymentStatus: (val: string) => void;
+  onClear: () => void;
+}
+
+// BookingsTable.tsx types 
+export interface TableProps {
+  bookings: Booking[];
+  loading: boolean;
+  onView: (b: Booking) => void;
+}
+
+// BannerSettings.tsx types 
+export interface Props {
+  banners: any[];
+  loading: boolean;
+  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDelete: (banner: any) => void;
+}
+
+// DiscountSettings.tsx types 
+export interface DiscountSettingsProps {
+  discounts: Discount[];
+  newDiscount: {
+    p_code: string;
+    p_discount_type: "percentage" | "fixed";
+    p_discount_value: string;
+    p_valid_from: string;
+    p_valid_until: string;
+  };
+  setNewDiscount: (val: any) => void;
+  handleAddDiscount: () => void;
+  handleDeleteDiscount: (id: string) => void;
+  handleToggleDiscountStatus: (id: string, currentStatus: boolean) => void;
+}
+
+// GeneralSettings.tsx types 
+export interface GeneralSettingsProps {
+  orgData: Organization;
+  setOrgData: React.Dispatch<React.SetStateAction<Organization | null>>;
+  loading: boolean;
+  setHasChanges: (val: boolean) => void;
+  handleLogoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleUpdateOrg: () => void;
+
+  // Banner properties
+  banners: any[];
+  bannerLoading: boolean;
+  handleBannerUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleDeleteBanner: (banner: any) => Promise<void> | void;
+}
+
+// HolidaySettings.tsx types 
+export interface HolidaySettingsProps {
+  holidays: Holiday[];
+  newHoliday: {
+    p_date: string;
+    p_notes: string;
+    p_is_open: boolean;
+  };
+  setNewHoliday: (val: any) => void;
+  handleAddSchedule: () => void;
+  handleDeleteSchedule: (id: string) => void;
+}
+
+// AddShiftModal.tsx types 
+export interface AddShiftModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (shiftData: any) => void;
+  fieldId: string;
+  loading: boolean;
+}
+
+// AddSlotModal.tsx types 
+export interface AddSlotModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (shiftId: string) => void;
+  shiftName?: string;
+  startTime: string;
+  setStartTime: (t: string) => void;
+  endTime: string;
+  setEndTime: (t: string) => void;
+  loading: boolean;
+  shiftId: string | null;
+}
+
+// FilterBar.tsx types 
+export interface FilterBarProps {
+  selectedDate: string;
+  setSelectedDate: (date: string) => void;
+  fields: any[];
+  selectedField: any;
+  fieldDropdownOpen: boolean;
+  setFieldDropdownOpen: (open: boolean) => void;
+  onSelectField: (id: string) => void;
+}
+
+// SlotCard.tsx types
+export interface SlotCardProps {
+  slot: any;
+  onDelete: (id: string) => void;
+  onToggleMaintenance: () => void; // Prop passed from SlotsPage
+  formatTime: (t: string) => string;
+  getStatusColor: (status: string) => string;
+}
+
+// ImageUploadField.tsx types 
+export interface ImageUploadProps {
+  label: string;
+  url: string;
+  uploading: boolean;
+  onUpload: (file: File) => void;
+  type: "bg" | "icon";
+}
+
+// TurfCard.tsx types
+export interface TurfCardProps {
+  turf: any;
+  index: number;
+  onEdit: (turf: any) => void;
+  onDelete: (id: string) => void;
+}
+
+// LoginPage.tsx types 
+export interface LoginPageProps {
+  onLoginSuccess: () => void;
+}
+
+// Sidebar.tsx types 
+export interface SidebarProps {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  onLogout: () => void;
+}
+
+// TopBar.tsx types
+export interface TopBarProps {
+  setSidebarOpen: (open: boolean) => void;
+  onLogout: () => void;
 }

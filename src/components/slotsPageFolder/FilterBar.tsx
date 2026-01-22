@@ -1,14 +1,7 @@
 import { Calendar as CalendarIcon, ChevronDown } from "lucide-react";
 
-interface FilterBarProps {
-  selectedDate: string;
-  setSelectedDate: (date: string) => void;
-  fields: any[];
-  selectedField: any;
-  fieldDropdownOpen: boolean;
-  setFieldDropdownOpen: (open: boolean) => void;
-  onSelectField: (id: string) => void;
-}
+// Type 
+import { FilterBarProps } from "../types";
 
 export function FilterBar({
   selectedDate,

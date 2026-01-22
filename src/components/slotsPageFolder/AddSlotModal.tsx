@@ -1,15 +1,5 @@
-interface AddSlotModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAdd: (shiftId: string) => void;
-  shiftName?: string;
-  startTime: string;
-  setStartTime: (t: string) => void;
-  endTime: string;
-  setEndTime: (t: string) => void;
-  loading: boolean;
-  shiftId: string | null;
-}
+// Types 
+import { AddSlotModalProps } from "../types";
 
 export function AddSlotModal({
   isOpen,

@@ -10,11 +10,8 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom"; // Import NavLink
 
-interface SidebarProps {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  onLogout: () => void;
-}
+// Type 
+import { SidebarProps } from "./types";
 
 export function Sidebar({
   sidebarOpen,

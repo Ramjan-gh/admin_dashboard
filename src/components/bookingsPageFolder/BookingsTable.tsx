@@ -1,5 +1,6 @@
 import { Eye } from "lucide-react";
-import { Booking } from "./types";
+// Types 
+import { TableProps } from "../types";
 
 export const getStatusColor = (status: string) => {
   switch (status) {
@@ -14,11 +15,7 @@ export const getStatusColor = (status: string) => {
   }
 };
 
-interface TableProps {
-  bookings: Booking[];
-  loading: boolean;
-  onView: (b: Booking) => void;
-}
+
 
 export function BookingsTable({ bookings, loading, onView }: TableProps) {
   return (

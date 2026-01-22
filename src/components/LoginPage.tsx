@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { LogIn, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
+
+// Types
+import { LoginPageProps } from "./types";
 
 const AUTH_URL = "https://himsgwtkvewhxvmjapqa.supabase.co/auth/v1";
 
-interface LoginPageProps {
-  onLoginSuccess: () => void;
-}
+
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [email, setEmail] = useState("");
@@ -35,10 +37,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         localStorage.setItem("sb-user", JSON.stringify(data.user));
         onLoginSuccess();
       } else {
-        alert(data.error_description || data.message || "Invalid credentials");
+        toast.error(data.error_description || data.message || "Invalid credentials");
       }
     } catch (err) {
-      alert("Network error. Please try again.");
+      toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
     }

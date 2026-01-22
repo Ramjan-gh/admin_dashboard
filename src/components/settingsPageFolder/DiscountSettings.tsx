@@ -1,21 +1,10 @@
 import React from "react";
 import { Trash2 } from "lucide-react";
-import { Discount } from "../types"; // Adjust path based on your file structure
 
-interface DiscountSettingsProps {
-  discounts: Discount[];
-  newDiscount: {
-    p_code: string;
-    p_discount_type: "percentage" | "fixed";
-    p_discount_value: string;
-    p_valid_from: string;
-    p_valid_until: string;
-  };
-  setNewDiscount: (val: any) => void;
-  handleAddDiscount: () => void;
-  handleDeleteDiscount: (id: string) => void;
-  handleToggleDiscountStatus: (id: string, currentStatus: boolean) => void;
-}
+// Types 
+import { DiscountSettingsProps } from "../types";
+
+
 
 export function DiscountSettings({
   discounts,

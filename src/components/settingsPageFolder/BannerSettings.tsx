@@ -1,11 +1,7 @@
 import { Plus, Trash2, Loader2, Image as ImageIcon } from "lucide-react";
 
-interface Props {
-  banners: any[];
-  loading: boolean;
-  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onDelete: (banner: any) => void;
-}
+// Types 
+import { Props } from "../types";
 
 export function BannerSettings({
   banners,

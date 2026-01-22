@@ -1,17 +1,8 @@
 import { Search, Filter, X, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-interface FilterProps {
-  search: string;
-  setSearch: (val: string) => void;
-  bookingDate: string;
-  setBookingDate: (val: string) => void;
-  fieldFilter: string;
-  setFieldFilter: (val: string) => void;
-  paymentStatus: string;
-  setPaymentStatus: (val: string) => void;
-  onClear: () => void;
-}
+// Types 
+import { FilterProps } from "../types";
 
 export function BookingFilters({
   search,

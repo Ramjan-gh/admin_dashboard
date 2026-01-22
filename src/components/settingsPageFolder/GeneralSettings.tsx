@@ -9,23 +9,11 @@ import {
   Save,
   Plus,
 } from "lucide-react";
-import { Organization } from "../types"; // Adjust path to your types
 import { BannerSettings } from "./BannerSettings"; // Import your banner component
 
-interface GeneralSettingsProps {
-  orgData: Organization;
-  setOrgData: React.Dispatch<React.SetStateAction<Organization | null>>;
-  loading: boolean;
-  setHasChanges: (val: boolean) => void;
-  handleLogoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleUpdateOrg: () => void;
+// Types
+import { GeneralSettingsProps } from "../types";
 
-  // Banner properties
-  banners: any[];
-  bannerLoading: boolean;
-  handleBannerUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleDeleteBanner: (banner: any) => Promise<void> | void;
-}
 
 export function GeneralSettings({
   orgData,

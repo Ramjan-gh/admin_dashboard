@@ -8,14 +8,10 @@ import {
   FileText,
   Info,
 } from "lucide-react";
-import { BookingDetails } from "./types";
-import { getStatusColor } from "./BookingsTable";
+import { getStatusColor } from "../bookingsPageFolder/BookingsTable";
+// Types 
+import { DrawerProps } from "../types";
 
-interface DrawerProps {
-  details: BookingDetails | null;
-  loading: boolean;
-  onClose: () => void;
-}
 
 export function BookingDetailsDrawer({
   details,

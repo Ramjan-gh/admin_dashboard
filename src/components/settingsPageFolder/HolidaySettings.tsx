@@ -1,18 +1,9 @@
 import React, { ChangeEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import { Holiday } from "../types";
+// Types 
+import { HolidaySettingsProps } from "../types";
 
-interface HolidaySettingsProps {
-  holidays: Holiday[];
-  newHoliday: {
-    p_date: string;
-    p_notes: string;
-    p_is_open: boolean;
-  };
-  setNewHoliday: (val: any) => void;
-  handleAddSchedule: () => void;
-  handleDeleteSchedule: (id: string) => void;
-}
+
 
 export function HolidaySettings({
   holidays,

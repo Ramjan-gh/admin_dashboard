@@ -1,13 +1,7 @@
 import { X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { UpdateShiftModalProps } from "../types"
 
-type UpdateShiftModalProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpdate: (data: any) => void;
-  shift: { id: string; name: string } | null;
-  loading: boolean;
-};
 
 export function UpdateShiftModal({
   isOpen,

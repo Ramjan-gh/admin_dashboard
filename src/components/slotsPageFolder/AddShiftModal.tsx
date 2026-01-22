@@ -1,12 +1,7 @@
 import { useState } from "react";
 
-interface AddShiftModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAdd: (shiftData: any) => void;
-  fieldId: string;
-  loading: boolean;
-}
+// Types 
+import { AddShiftModalProps } from "../types";
 
 export function AddShiftModal({
   isOpen,

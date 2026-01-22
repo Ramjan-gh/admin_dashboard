@@ -2,11 +2,8 @@ import { Menu, LogOut, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 
-interface TopBarProps {
-  setSidebarOpen: (open: boolean) => void;
-  onLogout: () => void;
-  // setCurrentPage is no longer needed
-}
+// Type 
+import { TopBarProps } from "./types";
 
 export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);

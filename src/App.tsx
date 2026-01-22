@@ -69,11 +69,11 @@ export default function App() {
                   <main className="flex-1 overflow-y-auto">
                     <Routes>
                       <Route path="/" element={<DashboardHome />} />
-                      {/* <Route path="/bookings" element={<BookingsPage />} /> */}
-                      {/* <Route path="/slots" element={<SlotsPage />} /> */}
+                      <Route path="/bookings" element={<BookingsPage />} />
+                      <Route path="/slots" element={<SlotsPage />} />
                       <Route path="/turfs" element={<TurfsPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
-                      {/* <Route path="/profile" element={<ProfilePage />} /> */}
+                      <Route path="/profile" element={<ProfilePage />} />
                       {/* Catch-all inside dashboard */}
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>
