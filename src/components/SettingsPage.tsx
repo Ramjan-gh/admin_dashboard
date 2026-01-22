@@ -7,12 +7,13 @@ import {
   Plus,
   Trash2,
   MapPin,
-  Globe, // <--- Add this
+  Globe,
   Instagram,
   Facebook,
   MessageCircle,
   AlertCircle,
   Loader2,
+  Image as ImageIcon,
 } from "lucide-react";
 
 // --- Types & Interfaces ---
@@ -80,13 +81,19 @@ export function SettingsPage() {
     p_is_active: true,
   });
 
+  // Make sure this matches what your DB returns
+  const [banners, setBanners] = useState<
+    { id: any; file_url: string; media_type: string }[]
+  >([]);
+  const [bannerLoading, setBannerLoading] = useState(false);
+
   const getHeaders = useCallback(
     () => ({
       "Content-Type": "application/json",
       apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
     }),
-    []
+    [],
   );
 
   const fetchAllData = useCallback(async () => {
@@ -95,13 +102,13 @@ export function SettingsPage() {
       const headers = getHeaders();
       const [orgRes, scheduleRes, discountRes] = await Promise.all([
         fetch(`${BASE_URL}/rest/v1/rpc/get_organization`, { headers }).then(
-          (res) => res.json()
+          (res) => res.json(),
         ),
         fetch(`${BASE_URL}/rest/v1/rpc/get_business_schedule`, {
           headers,
         }).then((res) => res.json()),
         fetch(`${BASE_URL}/rest/v1/rpc/get_discount_codes`, { headers }).then(
-          (res) => res.json()
+          (res) => res.json(),
         ),
       ]);
 
@@ -118,6 +125,30 @@ export function SettingsPage() {
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  // Fetch banners on mount
+  useEffect(() => {
+    fetchBanners();
+  }, []);
+
+  const fetchBanners = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_banners`, {
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBanners(data);
+      }
+    } catch (err) {
+      console.error("Error fetching banners:", err);
+    }
+  };
+
+  
 
   const handleUpdateOrg = async () => {
     if (!orgData) return; // Fixes "possibly null" error
@@ -145,7 +176,7 @@ export function SettingsPage() {
             p_tiktok_url: orgData.tiktok_url,
             p_whatsapp_url: orgData.whatsapp_url,
           }),
-        }
+        },
       );
       if (response.ok) {
         setHasChanges(false);
@@ -162,7 +193,7 @@ export function SettingsPage() {
     if (!newHoliday.p_date) return alert("Date is required");
     if (!newHoliday.p_notes || newHoliday.p_notes.trim() === "") {
       return alert(
-        "Note cannot be empty. Please provide a title for the holiday."
+        "Note cannot be empty. Please provide a title for the holiday.",
       );
     }
 
@@ -200,7 +231,7 @@ export function SettingsPage() {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ p_id: id }),
-      }
+      },
     );
     if (res.ok) fetchAllData();
   };
@@ -319,84 +350,221 @@ export function SettingsPage() {
       </div>
     );
 
-    const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !orgData) return;
+  const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !orgData) return;
 
-      // 1. Get the session token (matching your working pattern)
-      const accessToken = localStorage.getItem("sb-access-token");
-      if (!accessToken) {
-        alert("You must be logged in to upload images.");
-        return;
+    // 1. Get the session token (matching your working pattern)
+    const accessToken = localStorage.getItem("sb-access-token");
+    if (!accessToken) {
+      alert("You must be logged in to upload images.");
+      return;
+    }
+
+    setLoading(true);
+
+    // 2. Setup paths
+    const folder = "logo";
+    const fileExt = file.name.split(".").pop();
+    const fileName = `logo-${Date.now()}.${fileExt}`;
+    const uploadUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${fileName}`;
+
+    try {
+      // 3. Delete Old File Logic
+      if (orgData.logo_url && orgData.logo_url.includes(BASE_URL)) {
+        try {
+          const urlParts = orgData.logo_url.split("/");
+          const oldFileName = urlParts[urlParts.length - 1];
+          const deleteUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${oldFileName}`;
+
+          await fetch(deleteUrl, {
+            method: "DELETE",
+            headers: {
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+          console.log("Old logo cleaned up");
+        } catch (err) {
+          console.error("Failed to delete old image:", err);
+        }
       }
 
-      setLoading(true);
+      // 4. Upload New File
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": file.type,
+          "x-upsert": "true",
+        },
+        body: file,
+      });
 
-      // 2. Setup paths
-      const folder = "logo";
-      const fileExt = file.name.split(".").pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
-      const uploadUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${fileName}`;
+      const result = await response.json();
 
-      try {
-        // 3. Delete Old File Logic
-        if (orgData.logo_url && orgData.logo_url.includes(BASE_URL)) {
-          try {
-            const urlParts = orgData.logo_url.split("/");
-            const oldFileName = urlParts[urlParts.length - 1];
-            const deleteUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${oldFileName}`;
+      if (response.ok) {
+        const publicUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${fileName}`;
 
-            await fetch(deleteUrl, {
-              method: "DELETE",
-              headers: {
-                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${accessToken}`,
-              },
-            });
-            console.log("Old logo cleaned up");
-          } catch (err) {
-            console.error("Failed to delete old image:", err);
-          }
+        // Update local state
+        setOrgData((prev) => (prev ? { ...prev, logo_url: publicUrl } : null));
+        setHasChanges(true);
+
+        console.log("Upload successful:", publicUrl);
+      } else {
+        if (result.message?.includes("exp") || result.statusCode === "403") {
+          alert("Your session has expired. Please log in again.");
+        } else {
+          alert(`Upload failed: ${result.message}`);
         }
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("An error occurred during upload.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        // 4. Upload New File
-        const response = await fetch(uploadUrl, {
+    const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const accessToken = localStorage.getItem("sb-access-token");
+  if (!accessToken) {
+    alert("You must be logged in to upload banners.");
+    return;
+  }
+
+  setBannerLoading(true);
+
+  // 1. Setup paths
+  const folder = "banners";
+  const fileExt = file.name.split(".").pop();
+  const fileName = `banner-${Date.now()}.${fileExt}`;
+  const uploadUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${fileName}`;
+
+  try {
+    // 2. Upload File to Storage (Physical file)
+    const storageResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": file.type,
+        "x-upsert": "true",
+      },
+      body: file,
+    });
+
+    if (!storageResponse.ok) {
+      throw new Error("Failed to upload file to storage.");
+    }
+
+    // Construct the public URL for the database
+    const publicUrl = `${BASE_URL}/storage/v1/object/public/media/${folder}/${fileName}`;
+
+    // 3. Add to Database via your /add_media API
+    const dbResponse = await fetch(`${BASE_URL}/rest/v1/rpc/add_media`, {
+      method: "POST",
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_use_case: "banner",
+        p_media_type: "image",
+        p_file_url: publicUrl,
+      }),
+    });
+
+    if (dbResponse.ok) {
+      const newBannerRecord = await dbResponse.json();
+      
+      // 4. Update local state with the actual DB response (includes the real ID)
+      setBanners((prev) => [...prev, newBannerRecord]);
+      
+      console.log("Banner added to DB successfully:", newBannerRecord);
+    } else {
+      const errorData = await dbResponse.json();
+      console.error("Database error:", errorData);
+      alert("File uploaded, but failed to save record in database.");
+    }
+  } catch (error) {
+    console.error("Banner upload error:", error);
+    alert("An error occurred during upload.");
+  } finally {
+    setBannerLoading(false);
+  }
+};
+
+  const handleDeleteBanner = async (banner: {
+    id: string;
+    file_url: string;
+  }) => {
+    const accessToken = localStorage.getItem("sb-access-token");
+    if (!accessToken) return;
+
+    const confirmDelete = confirm(
+      "Are you sure you want to delete this banner?",
+    );
+    if (!confirmDelete) return;
+
+    try {
+      // 1. Delete from Database first (using your specific API)
+      const dbResponse = await fetch(
+        `${BASE_URL}/rest/v1/rpc/delete_media_by_id`,
+        {
           method: "POST",
           headers: {
             apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
             Authorization: `Bearer ${accessToken}`,
-            "Content-Type": file.type,
-            "x-upsert": "true",
+            "Content-Type": "application/json",
           },
-          body: file,
-        });
+          body: JSON.stringify({
+            p_media_id: banner.id, // Using the ID from your API response
+          }),
+        },
+      );
 
-        const result = await response.json();
-
-        if (response.ok) {
-          const publicUrl = `${BASE_URL}/storage/v1/object/public/media/${folder}/${fileName}`;
-
-          // Update local state
-          setOrgData((prev) =>
-            prev ? { ...prev, logo_url: publicUrl } : null,
-          );
-          setHasChanges(true);
-
-          console.log("Upload successful:", publicUrl);
-        } else {
-          if (result.message?.includes("exp") || result.statusCode === "403") {
-            alert("Your session has expired. Please log in again.");
-          } else {
-            alert(`Upload failed: ${result.message}`);
-          }
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        alert("An error occurred during upload.");
-      } finally {
-        setLoading(false);
+      if (!dbResponse.ok) {
+        const dbError = await dbResponse.json();
+        throw new Error(
+          dbError.message || "Failed to delete record from database",
+        );
       }
-    };
+
+      // 2. Delete from Storage (Physical file)
+      const urlParts = banner.file_url.split("/");
+      const fileName = urlParts[urlParts.length - 1];
+      const storageDeleteUrl = `${BASE_URL}/storage/v1/object/media/banners/${fileName}`;
+
+      const storageResponse = await fetch(storageDeleteUrl, {
+        method: "DELETE",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (storageResponse.ok) {
+        // 3. Update UI state
+        setBanners((prev) => prev.filter((b) => b.id !== banner.id));
+        console.log("Banner deleted successfully from DB and Storage");
+      } else {
+        console.warn(
+          "Database record deleted, but storage file might still exist.",
+        );
+        // Still remove from UI because the DB record is gone
+        setBanners((prev) => prev.filter((b) => b.id !== banner.id));
+      }
+    } catch (error: any) {
+      console.error("Error deleting banner:", error);
+      alert(error.message || "An error occurred while deleting the banner.");
+    }
+  };
 
   return (
     <div className="p-4 lg:p-6 space-y-6">
@@ -443,6 +611,61 @@ export function SettingsPage() {
           {/* --- GENERAL TAB --- */}
           {activeTab === "general" && orgData && (
             <div className="space-y-8 animate-in fade-in duration-300">
+              {/* --- BANNERS SECTION --- */}
+              <section className="space-y-4">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                  <ImageIcon className="w-4 h-4 text-purple-600" /> Hero Banners
+                </h3>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {banners.map((banner, idx) => (
+                    <div
+                      key={idx}
+                      className="relative group aspect-video rounded-xl overflow-hidden border bg-gray-100 shadow-sm"
+                    >
+                      <img
+                        src={banner.file_url}
+                        className="w-full h-full object-cover"
+                        alt="Banner"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          onClick={() => handleDeleteBanner(banner)} // Pass the whole object
+                          className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors shadow-lg"
+                          title="Delete Banner"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Upload Placeholder */}
+                  <label className="flex flex-col items-center justify-center aspect-video rounded-xl border-2 border-dashed border-gray-300 hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all group">
+                    {bannerLoading ? (
+                      <div className="animate-spin h-6 w-6 border-2 border-purple-500 border-t-transparent rounded-full" />
+                    ) : (
+                      <>
+                        <Plus className="w-8 h-8 text-gray-400 group-hover:text-purple-500" />
+                        <span className="text-xs text-gray-400 group-hover:text-purple-500 font-medium mt-1">
+                          Add Banner
+                        </span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleBannerUpload}
+                      disabled={bannerLoading}
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-gray-400 italic">
+                  Recommended size: 1200x400px (3:1 aspect ratio)
+                </p>
+              </section>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* 1. Identity & Branding */}
                 <section className="space-y-4">
@@ -653,6 +876,7 @@ export function SettingsPage() {
                 </section>
               </div>
 
+              {/* Footer Save Button */}
               <div className="pt-6 border-t">
                 <button
                   onClick={handleUpdateOrg}
