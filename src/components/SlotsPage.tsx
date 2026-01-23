@@ -44,21 +44,19 @@ export function SlotsPage() {
   const onAddSlotSubmit = async (shiftId: string) => {
     setIsProcessing(true);
     try {
-      // We pull modalStartTime and modalEndTime directly from the component's state
-      const res = await handleAddSlot({
+      // handleAddSlot in useSlots now handles toast.promise internally
+      await handleAddSlot({
         p_shift_id: shiftId,
         p_start_time: modalStartTime + ":00",
         p_end_time: modalEndTime + ":00",
       });
 
-      const data = await res.json();
-      if (!res.ok || data.success === false) {
-        toast.error(data.message || "Failed");
-      } else {
-        setAddSlotModalOpen(false);
-      }
+      // If we get here, the promise resolved successfully
+      setAddSlotModalOpen(false);
     } catch (error) {
-      toast.error("An error occurred while adding the slot.");
+      // The hook already showed the specific API error toast,
+      // so we just log it for debugging here.
+      console.error("Submission error:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -66,9 +64,14 @@ export function SlotsPage() {
 
   const onAddShiftSubmit = async (data: any) => {
     setIsProcessing(true);
-    const res = await handleAddShift(data);
-    if (res.ok) setAddShiftModalOpen(false);
-    setIsProcessing(false);
+    try {
+      await handleAddShift(data);
+      setAddShiftModalOpen(false);
+    } catch (error) {
+      console.error("Shift submission error:", error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (

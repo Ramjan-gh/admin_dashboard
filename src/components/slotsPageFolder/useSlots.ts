@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 // --- Types ---
 import { Slot, Shift, Field } from "../types";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
-
-
 
 export function useSlots() {
   const [fields, setFields] = useState<Field[]>([]);
@@ -61,69 +60,139 @@ export function useSlots() {
   useEffect(() => { fetchFields(); }, []);
   useEffect(() => { fetchSlots(); }, [fetchSlots]);
 
+  // --- API Handlers with Toast Messages from API ---
+
   const handleUpdateShift = async (payload: any) => {
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_shift`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(payload),
+    const promise = async () => {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_shift`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to update shift");
+      fetchSlots();
+      return data;
+    };
+
+    toast.promise(promise(), {
+      loading: 'Updating shift...',
+      success: (data) => data.message || 'Shift updated successfully',
+      error: (err) => err.message,
     });
-    if (res.ok) fetchSlots();
-    return res;
+    return promise(); 
   };
 
   const handleAddSlot = async (payload: any) => {
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(payload),
+    const promise = async () => {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to add slot");
+      fetchSlots();
+      return data;
+    };
+
+    toast.promise(promise(), {
+      loading: 'Adding slot...',
+      success: (data) => data.message || 'Slot added successfully',
+      error: (err) => err.message,
     });
-    if (res.ok) fetchSlots();
-    return res;
+    return promise(); 
   };
 
   const handleDeleteSlot = async (slotId: string) => {
     if (!confirm("Are you sure?")) return;
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_slot`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({ p_slot_id: slotId }),
+    const promise = async () => {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_slot`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ p_slot_id: slotId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to delete slot");
+      fetchSlots();
+      return data;
+    };
+
+    toast.promise(promise(), {
+      loading: 'Deleting slot...',
+      success: (data) => data.message || 'Slot deleted',
+      error: (err) => err.message,
     });
-    if (res.ok) fetchSlots();
   };
 
   const handleAddShift = async (shiftData: any) => {
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_shift`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(shiftData),
+    const promise = async () => {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_shift`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(shiftData),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to add shift");
+      fetchSlots();
+      return data;
+    };
+
+    toast.promise(promise(), {
+      loading: 'Creating new shift...',
+      success: (data) => data.message || 'Shift created successfully',
+      error: (err) => err.message,
     });
-    if (res.ok) fetchSlots();
-    return res;
+    return promise();
   };
 
   const handleDeleteShift = async (shiftId: string) => {
     if (!confirm("Delete this shift and all its slots permanently?")) return;
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_shift`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify({ p_shift_id: shiftId }),
+    const promise = async () => {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_shift`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ p_shift_id: shiftId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to delete shift");
+      fetchSlots();
+      return data;
+    };
+
+    toast.promise(promise(), {
+      loading: 'Deleting shift...',
+      success: (data) => data.message || 'Shift deleted successfully',
+      error: (err) => err.message,
     });
-    if (res.ok) fetchSlots();
   };
 
   const handleToggleMaintenance = async (slot: Slot) => {
     const isMaintenance = slot.status === "maintenance";
-    const endpoint = isMaintenance ? "remove_slot_from_maintenance" : "reserve_slot_for_maintenance";
-    const body = isMaintenance 
-      ? { p_maintenance_id: (slot as any).maintenance_id } 
-      : { p_slot_id: slot.slot_id, p_date: selectedDate };
+    const actionText = isMaintenance ? "Removing from maintenance..." : "Setting maintenance...";
+    
+    const promise = async () => {
+      const endpoint = isMaintenance ? "remove_slot_from_maintenance" : "reserve_slot_for_maintenance";
+      const body = isMaintenance 
+        ? { p_maintenance_id: (slot as any).maintenance_id } 
+        : { p_slot_id: slot.slot_id, p_date: selectedDate };
 
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/${endpoint}`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(body),
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/${endpoint}`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Maintenance update failed");
+      fetchSlots();
+      return data;
+    };
+
+    toast.promise(promise(), {
+      loading: actionText,
+      success: (data) => data.message || 'Status updated',
+      error: (err) => err.message,
     });
-    if (res.ok) fetchSlots();
   };
 
   return {
