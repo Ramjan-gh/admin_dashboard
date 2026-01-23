@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-// --- Types ---
 import { Slot, Shift, Field } from "../types";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
@@ -60,118 +59,131 @@ export function useSlots() {
   useEffect(() => { fetchFields(); }, []);
   useEffect(() => { fetchSlots(); }, [fetchSlots]);
 
-  // --- API Handlers with Toast Messages from API ---
+  // --- API Handlers ---
 
   const handleUpdateShift = async (payload: any) => {
-    const promise = async () => {
+    const execution = (async () => {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_shift`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Failed to update shift");
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || "Failed to update shift");
+      }
       fetchSlots();
       return data;
-    };
+    })();
 
-    toast.promise(promise(), {
+    toast.promise(execution, {
       loading: 'Updating shift...',
       success: (data) => data.message || 'Shift updated successfully',
       error: (err) => err.message,
     });
-    return promise(); 
+    return execution;
   };
 
   const handleAddSlot = async (payload: any) => {
-    const promise = async () => {
+    const execution = (async () => {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to add slot");
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || "Failed to add slot");
+      }
       fetchSlots();
       return data;
-    };
+    })();
 
-    toast.promise(promise(), {
+    toast.promise(execution, {
       loading: 'Adding slot...',
       success: (data) => data.message || 'Slot added successfully',
       error: (err) => err.message,
     });
-    return promise(); 
+    return execution;
   };
 
   const handleDeleteSlot = async (slotId: string) => {
     if (!confirm("Are you sure?")) return;
-    const promise = async () => {
+    const execution = (async () => {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_slot`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ p_slot_id: slotId }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Failed to delete slot");
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || "Failed to delete slot");
+      }
       fetchSlots();
       return data;
-    };
+    })();
 
-    toast.promise(promise(), {
+    toast.promise(execution, {
       loading: 'Deleting slot...',
       success: (data) => data.message || 'Slot deleted',
       error: (err) => err.message,
     });
+    return execution;
   };
 
   const handleAddShift = async (shiftData: any) => {
-    const promise = async () => {
+    const execution = (async () => {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_shift`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(shiftData),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Failed to add shift");
+      if (!res.ok || data.success === false) {
+        // This will display "A shift named '...' already exists" if that's what the API returns
+        throw new Error(data.message || "Failed to add shift");
+      }
       fetchSlots();
       return data;
-    };
+    })();
 
-    toast.promise(promise(), {
+    toast.promise(execution, {
       loading: 'Creating new shift...',
       success: (data) => data.message || 'Shift created successfully',
       error: (err) => err.message,
     });
-    return promise();
+    return execution;
   };
 
   const handleDeleteShift = async (shiftId: string) => {
     if (!confirm("Delete this shift and all its slots permanently?")) return;
-    const promise = async () => {
+    const execution = (async () => {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_shift`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ p_shift_id: shiftId }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Failed to delete shift");
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || "Failed to delete shift");
+      }
       fetchSlots();
       return data;
-    };
+    })();
 
-    toast.promise(promise(), {
+    toast.promise(execution, {
       loading: 'Deleting shift...',
       success: (data) => data.message || 'Shift deleted successfully',
       error: (err) => err.message,
     });
+    return execution;
   };
 
   const handleToggleMaintenance = async (slot: Slot) => {
     const isMaintenance = slot.status === "maintenance";
     const actionText = isMaintenance ? "Removing from maintenance..." : "Setting maintenance...";
     
-    const promise = async () => {
+    const execution = (async () => {
       const endpoint = isMaintenance ? "remove_slot_from_maintenance" : "reserve_slot_for_maintenance";
       const body = isMaintenance 
         ? { p_maintenance_id: (slot as any).maintenance_id } 
@@ -183,16 +195,19 @@ export function useSlots() {
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Maintenance update failed");
+      if (!res.ok || data.success === false) {
+        throw new Error(data.message || "Maintenance update failed");
+      }
       fetchSlots();
       return data;
-    };
+    })();
 
-    toast.promise(promise(), {
+    toast.promise(execution, {
       loading: actionText,
       success: (data) => data.message || 'Status updated',
       error: (err) => err.message,
     });
+    return execution;
   };
 
   return {
