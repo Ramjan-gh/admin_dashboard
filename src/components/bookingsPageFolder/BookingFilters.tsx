@@ -144,7 +144,7 @@ export function BookingFilters({
                       <button
                         key={field.id}
                         onClick={() => {
-                          setFieldFilter(field.id);
+                          setFieldFilter(field.name);
                           setFieldDropdownOpen(false);
                         }}
                         className="w-full text-left px-4 py-2 hover:bg-purple-50 transition-colors text-sm"
