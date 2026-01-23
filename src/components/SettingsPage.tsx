@@ -1,7 +1,7 @@
 import { Building, Calendar, Tag, AlertCircle, Loader2 } from "lucide-react";
-import { GeneralSettings } from "./settingsPageFolder/GeneralSettings";
+import { GeneralSettings } from "./settingsPageFolder/generalSettingsFolder/GeneralSettings";
 import { HolidaySettings } from "./settingsPageFolder/HolidaySettings";
-import { DiscountSettings } from "./settingsPageFolder/DiscountSettings";
+import { DiscountSettings } from "./settingsPageFolder/discountSettingsFolder/DiscountSettings";
 import { useSettings } from "./settingsPageFolder/useSettings"; 
 
 export function SettingsPage() {

@@ -12,7 +12,7 @@ import {
 import { BannerSettings } from "./BannerSettings"; // Import your banner component
 
 // Types
-import { GeneralSettingsProps } from "../types";
+import { GeneralSettingsProps } from "../../types";
 
 
 export function GeneralSettings({

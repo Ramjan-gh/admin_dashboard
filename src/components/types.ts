@@ -2,9 +2,9 @@ import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer"
 import { BookingFilters } from "./bookingsPageFolder/BookingFilters";
 import { BookingsTable } from "./bookingsPageFolder/BookingsTable";
 import { LoginPage } from "./LoginPage";
-import { BannerSettings } from "./settingsPageFolder/BannerSettings";
-import { DiscountSettings } from "./settingsPageFolder/DiscountSettings";
-import { GeneralSettings } from "./settingsPageFolder/GeneralSettings";
+import { BannerSettings } from "./settingsPageFolder/generalSettingsFolder/BannerSettings";
+import { DiscountSettings } from "./settingsPageFolder/discountSettingsFolder/DiscountSettings";
+import { GeneralSettings } from "./settingsPageFolder/generalSettingsFolder/GeneralSettings";
 import { HolidaySettings } from "./settingsPageFolder/HolidaySettings";
 import { Sidebar } from "./Sidebar";
 import { SlotsPage } from "./SlotsPage";
