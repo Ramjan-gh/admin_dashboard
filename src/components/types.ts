@@ -112,7 +112,12 @@ export interface Discount {
   code: string;
   discount_type: "percentage" | "fixed";
   discount_value: number;
+  valid_from: string;    // ISO date string
+  valid_until: string;   // ISO date string
+  max_uses: number | null;
+  current_uses: number;
   is_active: boolean;
+  created_at: string;    // ISO date string
 }
 
 // UpdateShiftModal.tsx types 
@@ -178,13 +183,14 @@ export interface Props {
 
 // DiscountSettings.tsx types 
 export interface DiscountSettingsProps {
-  discounts: Discount[];
+  discounts: Discount[]; // Expects the full JSON structure
   newDiscount: {
     p_code: string;
     p_discount_type: "percentage" | "fixed";
     p_discount_value: string;
     p_valid_from: string;
     p_valid_until: string;
+    p_max_uses: number | null; // Added this
   };
   setNewDiscount: (val: any) => void;
   handleAddDiscount: () => void;

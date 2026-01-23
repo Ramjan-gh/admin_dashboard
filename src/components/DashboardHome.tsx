@@ -235,48 +235,6 @@ export function DashboardHome() {
     { name: "Other", value: 10, color: "#f97316" },
   ];
 
-  const upcomingBookings = [
-    {
-      id: "1CE6443C",
-      customer: "Ramjan Ali",
-      time: "08:00 - 09:30",
-      sport: "Football",
-      field: "Field A",
-      status: "confirmed",
-    },
-    {
-      id: "2BF7554D",
-      customer: "Karim Ahmed",
-      time: "10:00 - 11:30",
-      sport: "Cricket",
-      field: "Field B",
-      status: "confirmed",
-    },
-    {
-      id: "3AG8665E",
-      customer: "Rahim Uddin",
-      time: "14:00 - 15:30",
-      sport: "Football",
-      field: "Field A",
-      status: "pending",
-    },
-    {
-      id: "4BH9776F",
-      customer: "Jamal Hossain",
-      time: "16:00 - 17:30",
-      sport: "Badminton",
-      field: "Field C",
-      status: "confirmed",
-    },
-    {
-      id: "5CI0887G",
-      customer: "Sakib Khan",
-      time: "18:00 - 19:30",
-      sport: "Football",
-      field: "Field A",
-      status: "pending",
-    },
-  ];
 
   const revenueData = getRevenueData();
   const stats = getStats();
@@ -516,9 +474,9 @@ export function DashboardHome() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+        <div className=" bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-gray-900">{getChartTitle()}</h3>
@@ -546,6 +504,38 @@ export function DashboardHome() {
                 fill="url(#colorAmount)"
               />
             </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Occupancy & Sports Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Field Occupancy */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <h3 className="text-gray-900 mb-6">
+            Field Occupancy
+            {viewMode === "day" && " (Selected Day)"}
+            {viewMode === "month" && " (This Week)"}
+            {viewMode === "year" && " (This Month)"}
+          </h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={occupancyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="field" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" />
+              <Tooltip />
+              <Bar
+                dataKey="bookings"
+                fill="url(#barGradient)"
+                radius={[8, 8, 0, 0]}
+              />
+              <defs>
+                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#8b5cf6" />
+                </linearGradient>
+              </defs>
+            </BarChart>
           </ResponsiveContainer>
         </div>
 
@@ -584,75 +574,6 @@ export function DashboardHome() {
                   <span className="text-gray-700">{sport.name}</span>
                 </div>
                 <span className="text-gray-900">{sport.value}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Occupancy & Upcoming Bookings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Field Occupancy */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <h3 className="text-gray-900 mb-6">
-            Field Occupancy
-            {viewMode === "day" && " (Selected Day)"}
-            {viewMode === "month" && " (This Week)"}
-            {viewMode === "year" && " (This Month)"}
-          </h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={occupancyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="field" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip />
-              <Bar
-                dataKey="bookings"
-                fill="url(#barGradient)"
-                radius={[8, 8, 0, 0]}
-              />
-              <defs>
-                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" />
-                  <stop offset="100%" stopColor="#8b5cf6" />
-                </linearGradient>
-              </defs>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Upcoming Bookings */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-gray-900">Upcoming Bookings</h3>
-            <Clock className="w-5 h-5 text-gray-400" />
-          </div>
-          <div className="space-y-3 max-h-[280px] overflow-y-auto">
-            {upcomingBookings.map((booking) => (
-              <div
-                key={booking.id}
-                className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-xs">{booking.sport[0]}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 truncate">
-                    {booking.customer}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {booking.time} • {booking.field}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    booking.status === "confirmed"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-orange-100 text-orange-700"
-                  }`}
-                >
-                  {booking.status}
-                </span>
               </div>
             ))}
           </div>

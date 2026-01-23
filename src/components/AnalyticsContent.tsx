@@ -448,7 +448,7 @@ export function AnalyticsContent({
     return (
       <div className="space-y-6">
         {/* Customer Segments */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           <div>
             <h4 className="text-gray-900 mb-4">New vs Returning Customers</h4>
             <div className="space-y-4">
@@ -487,95 +487,10 @@ export function AnalyticsContent({
             </div>
           </div>
 
-          <div>
-            <h4 className="text-gray-900 mb-4">
-              Booking Frequency Distribution
-            </h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={bookingFrequency}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="customers"
-                >
-                  {bookingFrequency.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-4 space-y-2">
-              {bookingFrequency.map((freq, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: freq.color }}
-                    />
-                    <span className="text-gray-700">{freq.frequency}</span>
-                  </div>
-                  <span className="text-gray-900 font-medium">
-                    {freq.customers} customers
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          
         </div>
 
-        {/* Customer Retention */}
-        <div>
-          <h4 className="text-gray-900 mb-4">Customer Retention Trends</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={customerRetention}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip />
-              <Legend />
-              <Bar
-                dataKey="retained"
-                stackId="a"
-                fill="#10b981"
-                name="Retained"
-                radius={[8, 8, 0, 0]}
-              />
-              <Bar
-                dataKey="churned"
-                stackId="a"
-                fill="#ef4444"
-                name="Churned"
-                radius={[8, 8, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div className="bg-green-50 rounded-lg p-4">
-              <p className="text-xs text-green-600 mb-1">Avg. Retention Rate</p>
-              <p className="text-2xl text-green-900 font-semibold">77%</p>
-              <p className="text-xs text-green-600 mt-1">
-                ↑ 6.8% vs last period
-              </p>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <p className="text-xs text-purple-600 mb-1">
-                Customer Lifetime Value
-              </p>
-              <p className="text-2xl text-purple-900 font-semibold">৳3,840</p>
-              <p className="text-xs text-purple-600 mt-1">
-                Based on avg. 8 bookings
-              </p>
-            </div>
-          </div>
-        </div>
+        
       </div>
     );
   }
@@ -646,44 +561,6 @@ export function AnalyticsContent({
         </div>
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-100">
-          <div className="flex items-center justify-between mb-2">
-            <Zap className="w-5 h-5 text-blue-600" />
-            <span className="text-xs text-blue-600 font-medium">↑ 12%</span>
-          </div>
-          <p className="text-xs text-blue-600 mb-1">Avg. Booking Value</p>
-          <p className="text-2xl text-blue-900 font-semibold">৳273</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
-          <div className="flex items-center justify-between mb-2">
-            <Clock className="w-5 h-5 text-purple-600" />
-            <span className="text-xs text-purple-600 font-medium">Avg</span>
-          </div>
-          <p className="text-xs text-purple-600 mb-1">Booking Lead Time</p>
-          <p className="text-2xl text-purple-900 font-semibold">2.4 days</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
-          <div className="flex items-center justify-between mb-2">
-            <CreditCard className="w-5 h-5 text-green-600" />
-            <span className="text-xs text-green-600 font-medium">↑ 8%</span>
-          </div>
-          <p className="text-xs text-green-600 mb-1">Payment Collection</p>
-          <p className="text-2xl text-green-900 font-semibold">94%</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 border border-orange-100">
-          <div className="flex items-center justify-between mb-2">
-            <Target className="w-5 h-5 text-orange-600" />
-            <span className="text-xs text-orange-600 font-medium">Overall</span>
-          </div>
-          <p className="text-xs text-orange-600 mb-1">Avg. Utilization</p>
-          <p className="text-2xl text-orange-900 font-semibold">57%</p>
-        </div>
-      </div>
 
       {/* Peak Performance Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
