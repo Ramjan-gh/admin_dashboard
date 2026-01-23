@@ -181,21 +181,33 @@ export interface Props {
   onDelete: (banner: any) => void;
 }
 
+
+
 // DiscountSettings.tsx types 
+// Add this helper interface
+export interface ApiResponse {
+  success: boolean;
+  message: string;
+  // include other optional fields if needed
+  id?: string | null;
+}
+
 export interface DiscountSettingsProps {
-  discounts: Discount[]; // Expects the full JSON structure
+  discounts: Discount[];
   newDiscount: {
+    id?: string;
     p_code: string;
     p_discount_type: "percentage" | "fixed";
     p_discount_value: string;
     p_valid_from: string;
     p_valid_until: string;
-    p_max_uses: number | null; // Added this
+    p_max_uses: number | null;
   };
   setNewDiscount: (val: any) => void;
   handleAddDiscount: () => void;
   handleDeleteDiscount: (id: string) => void;
-  handleToggleDiscountStatus: (id: string, currentStatus: boolean) => void;
+  // Change void to Promise<ApiResponse | void>
+  handleToggleDiscountStatus: (id: string, currentStatus: boolean) => Promise<ApiResponse | void>;
 }
 
 // GeneralSettings.tsx types 

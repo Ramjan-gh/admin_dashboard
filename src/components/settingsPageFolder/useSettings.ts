@@ -4,6 +4,30 @@ import { Organization, Holiday, Discount } from "../types";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
+// --- Interfaces for Form States ---
+interface NewHolidayState {
+  id?: string; // Presence of ID determines Edit vs Add
+  p_date: string;
+  p_is_open: boolean;
+  p_notes: string;
+}
+
+interface NewDiscountState {
+  id?: string; // Presence of ID determines Edit vs Add
+  p_code: string;
+  p_discount_type: "percentage" | "fixed";
+  p_discount_value: string;
+  p_valid_from: string;
+  p_valid_until: string;
+  p_max_uses: number | null;
+  p_is_active: boolean;
+}
+
+interface ApiResponse {
+  success: boolean;
+  message: string;
+}
+
 export function useSettings() {
   const [activeTab, setActiveTab] = useState("general");
   const [hasChanges, setHasChanges] = useState(false);
@@ -16,17 +40,20 @@ export function useSettings() {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [banners, setBanners] = useState<{ id: any; file_url: string; media_type: string }[]>([]);
 
-  // Form States
-  const [newHoliday, setNewHoliday] = useState({ p_date: "", p_is_open: false, p_notes: "" });
-  const [newDiscount, setNewDiscount] = useState({
+  // Initial States (for resetting forms)
+  const initialHoliday: NewHolidayState = { p_date: "", p_is_open: false, p_notes: "" };
+  const initialDiscount: NewDiscountState = {
     p_code: "",
-    p_discount_type: "percentage" as "percentage" | "fixed",
+    p_discount_type: "percentage",
     p_discount_value: "",
     p_valid_from: "",
     p_valid_until: "",
-    p_max_uses: null as number | null,
+    p_max_uses: null,
     p_is_active: true,
-  });
+  };
+
+  const [newHoliday, setNewHoliday] = useState<NewHolidayState>(initialHoliday);
+  const [newDiscount, setNewDiscount] = useState<NewDiscountState>(initialDiscount);
 
   const getHeaders = useCallback(() => ({
     "Content-Type": "application/json",
@@ -34,14 +61,14 @@ export function useSettings() {
     Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
   }), []);
 
-  const fetchBanners = async () => {
+  const fetchBanners = useCallback(async () => {
     try {
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_banners`, { headers: getHeaders() });
       if (res.ok) setBanners(await res.json());
     } catch (err) {
       console.error("Error fetching banners:", err);
     }
-  };
+  }, [getHeaders]);
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -62,12 +89,13 @@ export function useSettings() {
     } finally {
       setLoading(false);
     }
-  }, [getHeaders]);
+  }, [getHeaders, fetchBanners]);
 
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
 
+  // --- ORGANIZATION SETTINGS ---
   const handleUpdateOrg = async () => {
     if (!orgData) return;
     try {
@@ -98,24 +126,34 @@ export function useSettings() {
     }
   };
 
+  // --- BUSINESS SCHEDULE / HOLIDAYS ---
   const handleAddSchedule = async () => {
     if (!newHoliday.p_date) return toast.error("Date is required");
     if (!newHoliday.p_notes?.trim()) return toast.error("Note cannot be empty");
 
     try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_business_schedule`, {
+      const isEditing = !!newHoliday.id;
+      // Using update_business_schedule for edits, add_business_schedule for new
+      const rpcName = isEditing ? 'update_business_schedule' : 'add_business_schedule';
+      
+      const payload = isEditing 
+        ? { p_id: newHoliday.id, p_date: newHoliday.p_date, p_is_open: newHoliday.p_is_open, p_notes: newHoliday.p_notes }
+        : { p_date: newHoliday.p_date, p_is_open: newHoliday.p_is_open, p_notes: newHoliday.p_notes };
+
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/${rpcName}`, {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify(newHoliday),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) {
+
+      if (res.ok) {
+        toast.success(isEditing ? "Schedule updated!" : "Schedule added successfully");
+        setNewHoliday(initialHoliday);
+        fetchAllData();
+      } else {
         const errorData = await res.json();
-        toast.error(errorData.message || "Failed to add schedule");
-        return;
+        toast.error(errorData.message || "Failed to save schedule");
       }
-      toast.success("Schedule added successfully");
-      setNewHoliday({ p_date: "", p_is_open: false, p_notes: "" });
-      fetchAllData();
     } catch (error) {
       toast.error("A network error occurred.");
     }
@@ -128,28 +166,67 @@ export function useSettings() {
       headers: getHeaders(),
       body: JSON.stringify({ p_id: id }),
     });
-    if (res.ok) fetchAllData();
+    if (res.ok) {
+      toast.success("Schedule deleted");
+      fetchAllData();
+    }
   };
 
+  // --- DISCOUNT CODES ---
   const handleAddDiscount = async () => {
     if (!newDiscount.p_code.trim()) return toast.error("Discount code is required");
     try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_discount`, {
+      const isEditing = !!newDiscount.id;
+      const rpcName = isEditing ? 'update_discount' : 'add_discount';
+
+      const payload = {
+        ...(isEditing && { p_id: newDiscount.id }),
+        p_code: newDiscount.p_code,
+        p_discount_type: newDiscount.p_discount_type,
+        p_discount_value: parseFloat(newDiscount.p_discount_value),
+        p_valid_from: newDiscount.p_valid_from,
+        p_valid_until: newDiscount.p_valid_until,
+        p_max_uses: newDiscount.p_max_uses,
+        p_is_active: newDiscount.p_is_active
+      };
+
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/${rpcName}`, {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ ...newDiscount, p_discount_value: parseFloat(newDiscount.p_discount_value) }),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       const result = Array.isArray(data) ? data[0] : data;
+
       if (!res.ok || result?.success === false) {
-        toast.error(result?.message || "Failed to add discount.");
+        toast.error(result?.message || "Failed to save discount.");
         return;
       }
-      toast.success("Discount added successfully!");
-      setNewDiscount({ p_code: "", p_discount_type: "percentage", p_discount_value: "", p_valid_from: "", p_valid_until: "", p_max_uses: null, p_is_active: true });
+
+      toast.success(isEditing ? "Discount updated!" : "Discount added successfully!");
+      setNewDiscount(initialDiscount);
       fetchAllData();
     } catch (error) {
       toast.error("A network error occurred.");
+    }
+  };
+
+  const handleToggleDiscountStatus = async (id: string, currentStatus: boolean): Promise<ApiResponse> => {
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_discount`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ p_id: id, p_is_active: !currentStatus }),
+      });
+      
+      if (res.ok) {
+        fetchAllData();
+        return { success: true, message: "Status updated successfully" };
+      }
+      return { success: false, message: "Failed to update status" };
+    } catch (error) {
+      return { success: false, message: "Network error occurred" };
     }
   };
 
@@ -170,19 +247,7 @@ export function useSettings() {
     }
   };
 
-  const handleToggleDiscountStatus = async (id: string, currentStatus: boolean) => {
-    try {
-      await fetch(`${BASE_URL}/rest/v1/rpc/update_discount`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ p_id: id, p_is_active: !currentStatus }),
-      });
-      fetchAllData();
-    } catch (error) {
-      toast.error("Error updating status");
-    }
-  };
-
+  // --- MEDIA UPLOADS ---
   const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !orgData) return;
@@ -221,7 +286,6 @@ export function useSettings() {
     const uploadUrl = `${BASE_URL}/storage/v1/object/media/banners/${fileName}`;
 
     try {
-      // 1. Upload to Storage
       const storageRes = await fetch(uploadUrl, {
         method: "POST",
         headers: { 
@@ -232,11 +296,8 @@ export function useSettings() {
         body: file,
       });
 
-      if (!storageRes.ok) {
-        throw new Error("Failed to upload image to storage");
-      }
+      if (!storageRes.ok) throw new Error("Failed to upload image to storage");
 
-      // 2. Save to Database
       const publicUrl = `${BASE_URL}/storage/v1/object/public/media/banners/${fileName}`;
       const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/add_media`, {
         method: "POST",
@@ -250,12 +311,11 @@ export function useSettings() {
 
       if (dbRes.ok) {
         toast.success("Banner uploaded successfully!");
-        fetchBanners(); // Refresh the list from the server
+        fetchBanners();
       } else {
         throw new Error("Failed to save banner details to database");
       }
     } catch (error: any) {
-      console.error("Banner upload error:", error);
       toast.error(error.message || "An error occurred during banner upload");
     } finally {
       setBannerLoading(false);
@@ -263,36 +323,32 @@ export function useSettings() {
   };
 
   const handleDeleteBanner = async (banner: { id: any; file_url: string }): Promise<void> => {
-  if (!confirm("Are you sure you want to delete this banner?")) return;
-  
-  const accessToken = localStorage.getItem("sb-access-token");
-  if (!accessToken) {
-    toast.error("Login required");
-    return;
-  }
-
-  try {
-    const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/delete_media_by_id`, {
-      method: "POST",
-      headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ p_media_id: banner.id }),
-    });
-
-    if (dbRes.ok) {
-      setBanners((prev) => prev.filter((b) => b.id !== banner.id));
-      toast.success("Banner deleted successfully");
-    } else {
-      const errorData = await dbRes.json();
-      toast.error(errorData.message || "Failed to delete banner");
+    if (!confirm("Are you sure you want to delete this banner?")) return;
+    
+    const accessToken = localStorage.getItem("sb-access-token");
+    if (!accessToken) {
+      toast.error("Login required");
+      return;
     }
-  } catch (error) {
-    console.error("Delete failed:", error);
-    toast.error("Failed to delete banner");
-  }
-  
-  // Explicitly return nothing to satisfy 'Promise<void>'
-  return; 
-};
+
+    try {
+      const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/delete_media_by_id`, {
+        method: "POST",
+        headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ p_media_id: banner.id }),
+      });
+
+      if (dbRes.ok) {
+        setBanners((prev) => prev.filter((b) => b.id !== banner.id));
+        toast.success("Banner deleted successfully");
+      } else {
+        const errorData = await dbRes.json();
+        toast.error(errorData.message || "Failed to delete banner");
+      }
+    } catch (error) {
+      toast.error("Failed to delete banner");
+    }
+  };
 
   return {
     activeTab, setActiveTab, hasChanges, setHasChanges, loading, orgData, setOrgData,
