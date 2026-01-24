@@ -1,264 +1,266 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
-  TrendingUp,
   Calendar,
   AlertCircle,
-  Loader2,
   ArrowRight,
   RefreshCcw,
+  Loader2,
+  DollarSign,
+  Activity,
+  UserCheck,
+  Target,
 } from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { RevenueTrendChart } from "./RevenueTrendChart";
+import { RevenueDistributionPie } from "./RevenueDistributionPie";
+import { AnalyticsContent } from "./AnalyticsContent";
 
-// 1. Define the API response interface
-interface RevenueApiResponse {
-  field_id: string;
-  field_name: string;
-  period_date: string;
-  period_label: string;
-  total_revenue: number;
-  total_bookings: number;
-}
+const calculateWeeksBetween = (start: string, end: string): number => {
+  const d1 = new Date(start);
+  const d2 = new Date(end);
+  const diffInMs = Math.abs(d2.getTime() - d1.getTime());
+  const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+  return Math.max(1, Math.ceil(diffInDays / 7));
+};
 
 export function DashboardHome() {
-  // Default range: Last 30 days
-  const [startDate, setStartDate] = useState("2025-12-25");
-  const [endDate, setEndDate] = useState("2026-01-24");
+  // 1. Core State
+  const [startDate, setStartDate] = useState("2026-01-01");
+  const [endDate, setEndDate] = useState("2026-01-25");
+  const [fieldId, setFieldId] = useState<string>("");
+  const [fieldsList, setFieldsList] = useState<any[]>([]);
 
-  const [apiData, setApiData] = useState<RevenueApiResponse[]>([]);
+  const [apiData, setApiData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analyticsTab, setAnalyticsTab] = useState<
+    "revenue" | "bookings" | "customers" | "operations"
+  >("revenue");
 
-  // 2. Memoized Headers including start_date and end_date
-  const getRequestHeaders = useCallback(
-    () => ({
+  const [analyticsData, setAnalyticsData] = useState({
+    revenueByField: [],
+    revenueByTimeSlot: [],
+    revenueByDayOfWeek: [],
+    paymentMethods: [],
+    discountPerformance: [],
+    bookingVolumeTrends: [],
+    timeSlotHeatMap: [],
+    fieldUtilization: [],
+    customerSegments: [],
+    customerRetention: [],
+    bookingFrequency: [],
+  });
+
+  // 2. Data Fetching Logic
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const headers = {
       "Content-Type": "application/json",
       apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      start_date: startDate,
-      end_date: endDate,
-    }),
-    [startDate, endDate],
-  );
-
-  // 3. API Fetch Logic
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const baseUrl = "https://himsgwtkvewhxvmjapqa.supabase.co";
-        const url = `${baseUrl}/rest/v1/rpc/get_revenue_trend`;
-
-        const response = await fetch(url, {
-          method: "GET",
-          headers: getRequestHeaders() as HeadersInit,
-        });
-
-        if (!response.ok) {
-          const errorBody = await response.json();
-          throw new Error(errorBody.message || "Failed to fetch revenue data");
-        }
-
-        const data: RevenueApiResponse[] = await response.json();
-        setApiData(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
     };
 
-    if (startDate && endDate) {
-      fetchData();
+    const baseUrl = "https://himsgwtkvewhxvmjapqa.supabase.co/rest/v1/rpc";
+
+    try {
+      const weeksToAnalyze = calculateWeeksBetween(startDate, endDate);
+      console.log(`Fetching pattern for ${weeksToAnalyze} weeks`);
+      // Step A: Always get the latest list of fields
+      const fieldsRes = await fetch(`${baseUrl}/get_fields`, { headers });
+      const availableFields = fieldsRes.ok ? await fieldsRes.json() : [];
+      setFieldsList(availableFields);
+
+      // Step B: Determine which Field ID to use for the detailed queries
+      // If we don't have a fieldId yet, default to the first one in the list
+      const activeFieldId =
+        fieldId || (availableFields.length > 0 ? availableFields[0].id : null);
+
+      if (!fieldId && activeFieldId) {
+        setFieldId(activeFieldId);
+      }
+
+      // Step C: Fetch all analytics data in parallel
+      const [trendRes, fields, weekly, slots, payments, discounts] =
+        await Promise.all([
+          fetch(
+            `${baseUrl}/get_revenue_trend?start_date=${startDate}&end_date=${endDate}`,
+            { headers },
+          ).then((res) => (res.ok ? res.json() : [])),
+
+          fetch(
+            `${baseUrl}/get_revenue_by_field?start_date=${startDate}&end_date=${endDate}`,
+            { headers },
+          ).then((res) => (res.ok ? res.json() : [])),
+
+          fetch(
+            `${baseUrl}/get_weekly_revenue_pattern?weeks_to_analyze=${weeksToAnalyze}`,
+            {
+              headers,
+            },
+          ).then((res) => (res.ok ? res.json() : [])),
+
+          fetch(
+            `${baseUrl}/get_revenue_by_time_slot?p_field_id=${activeFieldId}&start_date=${startDate}&end_date=${endDate}`,
+            { headers },
+          ).then(async (res) => {
+            if (!res.ok) {
+              const err = await res.json();
+              console.error("❌ Time Slot API Error:", err);
+              return [];
+            }
+            return res.json();
+          }),
+
+          fetch(
+            `${baseUrl}/get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`,
+            { headers },
+          ).then((res) => (res.ok ? res.json() : [])),
+
+          fetch(
+            `${baseUrl}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`,
+            { headers },
+          ).then((res) => (res.ok ? res.json() : [])),
+        ]);
+
+      // Debugging Log
+      
+
+      // Update States
+      setApiData(trendRes);
+      setAnalyticsData((prev) => ({
+        ...prev,
+        revenueByField: fields,
+        revenueByDayOfWeek: weekly,
+        revenueByTimeSlot: slots,
+        paymentMethods: payments,
+        discountPerformance: discounts,
+      }));
+    } catch (err: any) {
+      console.error("Full Data Sync Error:", err);
+      setError(
+        "Data sync partially failed. Check if database functions exist.",
+      );
+    } finally {
+      setLoading(false);
     }
-  }, [startDate, endDate, getRequestHeaders]);
+  }, [startDate, endDate, fieldId]);
 
-  // 4. Generate a strict continuous date range for the X-Axis
-  const chartData = useMemo(() => {
-    const dataMap = new Map<string, number>();
-
-    // Map existing API data to date keys
-    apiData.forEach((item) => {
-      const current = dataMap.get(item.period_date) || 0;
-      dataMap.set(item.period_date, current + Number(item.total_revenue));
-    });
-
-    const fullRangeData = [];
-    let curr = new Date(startDate);
-    const last = new Date(endDate);
-
-    // Loop through every day between start and end date
-    while (curr <= last) {
-      const dateStr = curr.toISOString().split("T")[0];
-
-      fullRangeData.push({
-        fullDate: dateStr,
-        // Short label for X-Axis (e.g., "Jan 01")
-        label: curr.toLocaleDateString("en-US", {
-          month: "short",
-          day: "2-digit",
-        }),
-        amount: dataMap.get(dateStr) || 0, // Fallback to 0 if no API data
-      });
-
-      curr.setDate(curr.getDate() + 1);
-    }
-
-    return fullRangeData;
-  }, [apiData, startDate, endDate]);
-
-  const resetDates = () => {
-    setStartDate("2025-12-25");
-    setEndDate("2026-01-24");
-  };
+  // 3. Effect Hooks
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto bg-gray-50/50 min-h-screen">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-            Revenue Analytics
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Revenue Analysis</h1>
           <p className="text-gray-500 text-sm">
-            Querying via custom date headers
+            Real-time stats from {startDate} to {endDate}
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-2 border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center gap-2">
-          <div className="flex items-center gap-2 px-2">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="text-sm border-none focus:ring-0 outline-none bg-transparent"
-            />
-          </div>
-
-          <ArrowRight className="hidden sm:block w-4 h-4 text-gray-300" />
-
-          <div className="flex items-center gap-2 px-2 border-l border-gray-100">
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="text-sm border-none focus:ring-0 outline-none bg-transparent"
-            />
-          </div>
-
+        {/* Date Range Picker */}
+        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400 ml-2" />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="text-sm border-none focus:ring-0"
+          />
+          <ArrowRight className="w-4 h-4 text-gray-300" />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="text-sm border-none focus:ring-0"
+          />
           <button
-            onClick={resetDates}
-            className="p-2 hover:bg-gray-50 rounded-lg transition-colors text-gray-400 hover:text-purple-600"
-            title="Reset Range"
+            onClick={fetchData}
+            className="p-2 hover:bg-purple-50 rounded-lg text-purple-600 transition-colors"
           >
-            <RefreshCcw size={16} />
+            <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      {/* Chart Section */}
-      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm min-h-[480px] flex flex-col">
-        <div className="flex items-center justify-between mb-10">
-          <div>
-            <h3 className="text-lg font-bold text-gray-800">Growth Trend</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-                Timeline: {startDate} — {endDate}
-              </p>
-            </div>
-          </div>
-          {loading ? (
-            <Loader2 className="animate-spin text-purple-600 w-5 h-5" />
-          ) : (
-            <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1 rounded-full text-xs font-bold">
-              <TrendingUp className="w-3 h-3" />
-              LIVE
-            </div>
-          )}
+      {error ? (
+        <div className="p-10 text-center bg-red-50 rounded-2xl border border-red-100 text-red-600">
+          <AlertCircle className="mx-auto mb-2" /> {error}
         </div>
+      ) : (
+        <>
+          {/* Top Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <RevenueTrendChart
+              data={apiData}
+              startDate={startDate}
+              endDate={endDate}
+              loading={loading}
+            />
+            <div className="lg:col-span-1">
+              {!loading && <RevenueDistributionPie data={apiData} />}
+            </div>
+          </div>
 
-        {error ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-red-400 bg-red-50/50 rounded-xl border border-dashed border-red-100">
-            <AlertCircle size={32} className="mb-2" />
-            <p className="text-sm font-semibold">{error}</p>
-          </div>
-        ) : (
-          <div className="flex-1 w-full">
-            <ResponsiveContainer width="100%" height={380}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient
-                    id="revenueGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
+          {/* Detailed Analytics Tabs Container */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="border-b border-gray-100 px-6">
+              <div className="flex space-x-8">
+                {[
+                  { id: "revenue", label: "Revenue", icon: DollarSign },
+                  { id: "bookings", label: "Bookings", icon: Activity },
+                  { id: "customers", label: "Customers", icon: UserCheck },
+                  { id: "operations", label: "Operations", icon: Target },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setAnalyticsTab(t.id as any)}
+                    className={`py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${
+                      analyticsTab === t.id
+                        ? "border-purple-600 text-purple-600"
+                        : "border-transparent text-gray-400 hover:text-gray-600"
+                    }`}
                   >
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f3f4f6"
+                    <t.icon size={16} />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6">
+              {loading ? (
+                <div className="h-64 flex flex-col items-center justify-center gap-2">
+                  <Loader2 className="animate-spin text-purple-600 w-8 h-8" />
+                </div>
+              ) : (
+                <AnalyticsContent
+                  weeksAnalyzed={calculateWeeksBetween(startDate, endDate)}
+                  tab={analyticsTab}
+                  revenueByField={analyticsData.revenueByField}
+                  revenueByTimeSlot={analyticsData.revenueByTimeSlot}
+                  revenueByDayOfWeek={analyticsData.revenueByDayOfWeek}
+                  paymentMethods={analyticsData.paymentMethods}
+                  discountPerformance={analyticsData.discountPerformance}
+                  bookingVolumeTrends={analyticsData.bookingVolumeTrends}
+                  timeSlotHeatMap={analyticsData.timeSlotHeatMap}
+                  fieldUtilization={analyticsData.fieldUtilization}
+                  customerSegments={analyticsData.customerSegments}
+                  customerRetention={analyticsData.customerRetention}
+                  bookingFrequency={analyticsData.bookingFrequency}
+                  fieldsList={fieldsList}
+                  currentFieldId={fieldId}
+                  onFieldChange={(id: string) => setFieldId(id)}
                 />
-                <XAxis
-                  dataKey="label"
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "#9ca3af" }}
-                  minTickGap={40}
-                  dy={15}
-                />
-                <YAxis
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "#9ca3af" }}
-                  tickFormatter={(v) => `৳${v}`}
-                />
-                <Tooltip
-                  cursor={{ stroke: "#c4b5fd", strokeWidth: 1.5 }}
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "none",
-                    boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
-                    padding: "12px",
-                  }}
-                  labelFormatter={(label: any, payload: any[]) => {
-                    return payload[0]?.payload?.fullDate || label;
-                  }}
-                  formatter={(value: number) => [
-                    `৳${value.toLocaleString()}`,
-                    "Total Revenue",
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="#8b5cf6"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#revenueGradient)"
-                  animationDuration={1200}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

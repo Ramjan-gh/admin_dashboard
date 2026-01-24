@@ -1,3 +1,4 @@
+import React, { useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -15,67 +16,36 @@ import {
   Legend,
 } from "recharts";
 import { Zap, Clock, CreditCard, Target } from "lucide-react";
+import {
+  type RevenueByFieldItem,
+  type WeeklyRevenuePatternItem,
+  type RevenueTrendItem,
+  type PaymentMethodItem,
+  type DiscountCodePerformanceItem,
+  type RevenueByTimeSlotItem,
+} from "../../src/components/utils/analytics-api";
 
 interface AnalyticsContentProps {
   tab: "revenue" | "bookings" | "customers" | "operations";
-  revenueByField: Array<{
-    field: string;
-    revenue: number;
-    bookings: number;
-    avgValue: number;
-  }>;
-  revenueByTimeSlot: Array<{
-    slot: string;
-    revenue: number;
-    bookings: number;
-    type: string;
-  }>;
-  revenueByDayOfWeek: Array<{ day: string; revenue: number; bookings: number }>;
-  paymentMethods: Array<{
-    method: string;
-    value: number;
-    color: string;
-    amount: number;
-  }>;
-  bookingVolumeTrends: Array<{
-    month: string;
-    bookings: number;
-    cancellations: number;
-    noShows: number;
-  }>;
-  timeSlotHeatMap: Array<any>;
-  fieldUtilization: Array<{
-    field: string;
-    utilization: number;
-    capacity: number;
-    actual: number;
-  }>;
-  customerSegments: Array<{
-    segment: string;
-    count: number;
-    percentage: number;
-    revenue: number;
-  }>;
-  customerRetention: Array<{
-    month: string;
-    retained: number;
-    churned: number;
-  }>;
-  bookingFrequency: Array<{
-    frequency: string;
-    customers: number;
-    color: string;
-  }>;
-  discountPerformance: Array<{
-    code: string;
-    uses: number;
-    revenue: number;
-    discount: number;
-    roi: number;
-  }>;
+  weeksAnalyzed: number;
+  revenueByField: RevenueByFieldItem[];
+  revenueByTimeSlot: RevenueByTimeSlotItem[];
+  revenueByDayOfWeek: WeeklyRevenuePatternItem[];
+  paymentMethods: PaymentMethodItem[];
+  bookingVolumeTrends: WeeklyRevenuePatternItem[];
+  timeSlotHeatMap: WeeklyRevenuePatternItem[];
+  fieldUtilization: RevenueByFieldItem[];
+  customerSegments: RevenueByFieldItem[];
+  customerRetention: RevenueByFieldItem[];
+  bookingFrequency: RevenueByFieldItem[];
+  discountPerformance: DiscountCodePerformanceItem[];
+  fieldsList: any[];
+  currentFieldId: string;
+  onFieldChange: (id: string) => void;
 }
 
 export function AnalyticsContent({
+  weeksAnalyzed,
   tab,
   revenueByField,
   revenueByTimeSlot,
@@ -88,19 +58,143 @@ export function AnalyticsContent({
   customerRetention,
   bookingFrequency,
   discountPerformance,
+  fieldsList,
+  currentFieldId,
+  onFieldChange,
 }: AnalyticsContentProps) {
   if (tab === "revenue") {
+    // Transform API data for charts
+    const revenueByFieldChart =
+      revenueByField.length > 0
+        ? revenueByField.map((item) => ({
+            field: item.field_name,
+            revenue: item.total_revenue,
+            bookings: item.total_bookings,
+            avgValue:
+              item.total_bookings > 0
+                ? Math.round(item.total_revenue / item.total_bookings)
+                : 0,
+          }))
+        : [
+            { field: "Field A", revenue: 45000, bookings: 156, avgValue: 288 },
+            { field: "Field B", revenue: 38000, bookings: 142, avgValue: 268 },
+            { field: "Field C", revenue: 28000, bookings: 98, avgValue: 286 },
+            { field: "Field D", revenue: 14000, bookings: 62, avgValue: 226 },
+          ];
+
+    const weeklyPatternChart = useMemo(() => {
+      if (!revenueByDayOfWeek || revenueByDayOfWeek.length === 0) return [];
+
+      return [...revenueByDayOfWeek]
+        .sort((a, b) => a.day_of_week - b.day_of_week) // Ensures Sunday (0) to Saturday (6)
+        .map((item) => ({
+          day: item.day_name.substring(0, 3), // "Sunday" -> "Sun"
+          revenue: Number(item.total_revenue), // Ensure it's a number
+          bookings: item.total_bookings,
+          avgTicket: Number(item.avg_revenue_per_booking),
+        }));
+    }, [revenueByDayOfWeek]);
+
+    const paymentMethodsChart =
+      paymentMethods.length > 0
+        ? paymentMethods.map((item, index) => {
+            const colors = ["#ec4899", "#8b5cf6", "#3b82f6", "#f97316"];
+            return {
+              method:
+                item.payment_method.charAt(0).toUpperCase() +
+                item.payment_method.slice(1),
+              value: item.percentage,
+              color: colors[index % colors.length],
+              amount: item.total_amount,
+            };
+          })
+        : [
+            { method: "bKash", value: 42, color: "#ec4899", amount: 52500 },
+            { method: "Nagad", value: 28, color: "#8b5cf6", amount: 35000 },
+            { method: "Card", value: 18, color: "#3b82f6", amount: 22500 },
+            { method: "Cash", value: 12, color: "#f97316", amount: 15000 },
+          ];
+
+    const discountPerformanceTable =
+      discountPerformance.length > 0
+        ? discountPerformance.map((item) => ({
+            code: item.code,
+            uses: item.total_uses,
+            revenue: item.total_revenue,
+            discount: item.total_discount_given,
+            roi: item.roi_percentage / 100,
+          }))
+        : [
+            {
+              code: "WEEKEND20",
+              uses: 86,
+              revenue: 18200,
+              discount: 4550,
+              roi: 4.0,
+            },
+            {
+              code: "NEWUSER15",
+              uses: 142,
+              revenue: 28400,
+              discount: 4980,
+              roi: 5.7,
+            },
+            {
+              code: "HOLIDAY25",
+              uses: 54,
+              revenue: 12150,
+              discount: 4050,
+              roi: 3.0,
+            },
+            {
+              code: "FLASH10",
+              uses: 98,
+              revenue: 22050,
+              discount: 2450,
+              roi: 9.0,
+            },
+          ];
+
+    // Mock data for time slot analysis (no API endpoint for this yet)
+    const revenueByTimeSlotData =
+      revenueByTimeSlot.length > 0
+        ? revenueByTimeSlot.map((item) => {
+            // 1. Clean up time strings (10:00:00 -> 10:00)
+            const start = item.start_time.slice(0, 5);
+            const end = item.end_time.slice(0, 5);
+            const hour = parseInt(start.split(":")[0]);
+
+            // 2. Determine type based on hour (example logic)
+            let slotType = "off-peak";
+            if (hour >= 17 && hour <= 21) {
+              slotType = "peak"; // 5 PM - 9 PM
+            } else if (hour >= 9 && hour < 17) {
+              slotType = "mid"; // 9 AM - 5 PM
+            }
+
+            return {
+              slot: `${start} - ${end}`,
+              revenue: Number(item.total_revenue),
+              bookings: item.total_bookings,
+              type: slotType, // This powers your <Cell /> fill logic
+              avgValue: Math.round(Number(item.avg_revenue_per_booking || 0)),
+            };
+          })
+        : [
+            /* Your fallback mock data stays here */
+          ];
+
     return (
-      <div className="space-y-6">
+      <div className="space-y-24">
         {/* Revenue by Field */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <h4 className="text-gray-900 mb-4">Revenue by Field</h4>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={revenueByField}>
+              <BarChart data={revenueByFieldChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="field" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" tickFormatter={(v) => `৳${v}`} />
                 <Tooltip />
                 <Bar
                   dataKey="revenue"
@@ -122,7 +216,7 @@ export function AnalyticsContent({
               </BarChart>
             </ResponsiveContainer>
             <div className="mt-4 space-y-2">
-              {revenueByField.map((field, idx) => (
+              {revenueByFieldChart.map((field, idx) => (
                 <div
                   key={idx}
                   className="flex items-center justify-between text-sm"
@@ -142,35 +236,77 @@ export function AnalyticsContent({
           </div>
 
           {/* Revenue by Time Slot */}
-          <div>
+          <div className="">
             <h4 className="text-gray-900 mb-4">Revenue by Time Slot</h4>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={revenueByTimeSlot} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" stroke="#9ca3af" />
-                <YAxis
-                  type="category"
-                  dataKey="slot"
-                  stroke="#9ca3af"
-                  width={80}
-                />
-                <Tooltip />
-                <Bar dataKey="revenue" radius={[0, 8, 8, 0]}>
-                  {revenueByTimeSlot.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        entry.type === "peak"
-                          ? "#10b981"
-                          : entry.type === "mid"
-                            ? "#3b82f6"
-                            : "#9ca3af"
-                      }
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {/* Dynamic Field Dropdown */}
+            <div className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100">
+              <span className="text-[10px] uppercase font-bold text-purple-400">
+                Select Field:
+              </span>
+              <select
+                value={currentFieldId}
+                onChange={(e) => onFieldChange(e.target.value)}
+                className="bg-transparent text-sm font-semibold text-purple-700 focus:ring-0 border-none p-0 cursor-pointer"
+              >
+                {fieldsList.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-full h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                {/* Added margin left to prevent label cutoff */}
+                <BarChart
+                  data={revenueByTimeSlotData}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#f0f0f0"
+                    horizontal={false}
+                  />
+                  <XAxis
+                    type="number"
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    tickFormatter={(v) => `৳${v}`}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="slot"
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    width={100} // Increased width for the labels
+                    tick={{ fill: "#6b7280" }} // Cleaner color for readability
+                  />
+                  <Tooltip
+                    cursor={{ fill: "transparent" }}
+                    contentStyle={{
+                      borderRadius: "8px",
+                      border: "none",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+                  <Bar dataKey="revenue" radius={[0, 4, 4, 0]} barSize={20}>
+                    {revenueByTimeSlotData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.type === "peak"
+                            ? "#10b981"
+                            : entry.type === "mid"
+                              ? "#3b82f6"
+                              : "#9ca3af"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
             <div className="mt-4 flex items-center gap-6 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -189,23 +325,74 @@ export function AnalyticsContent({
         </div>
 
         {/* Revenue by Day of Week & Payment Methods */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 gap-6">
           <div>
-            <h4 className="text-gray-900 mb-4">Weekly Revenue Pattern</h4>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h4 className="text-gray-900 font-bold">
+                  Weekly Revenue Pattern
+                </h4>
+                <p className="text-xs text-gray-500">
+                  Revenue distribution by day
+                </p>
+              </div>
+              <div className="bg-green-50 text-green-700 px-2 py-1 rounded text-[10px] font-bold">
+                {weeksAnalyzed} {weeksAnalyzed === 1 ? "WEEK" : "WEEK"} AVG
+              </div>
+            </div>
+
             <ResponsiveContainer width="100%" height={250}>
-              <ComposedChart data={revenueByDayOfWeek}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="day" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
-                <Tooltip />
-                <Bar dataKey="revenue" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
-                <Line
-                  type="monotone"
-                  dataKey="bookings"
-                  stroke="#ec4899"
-                  strokeWidth={2}
+              <BarChart
+                data={weeklyPatternChart}
+                margin={{ left: 10, right: 10 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f3f4f6"
                 />
-              </ComposedChart>
+                <XAxis
+                  dataKey="day"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#6b7280", fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: "#6b7280", fontSize: 12 }}
+                  tickFormatter={(val) =>
+                    `৳${val > 999 ? (val / 1000).toFixed(1) + "k" : val}`
+                  }
+                  width={45}
+                />
+                <Tooltip
+                  cursor={{ fill: "#f9fafb" }}
+                  contentStyle={{
+                    borderRadius: "12px",
+                    border: "none",
+                    boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                  }}
+                  formatter={(value: number) => [
+                    `$${value.toLocaleString()}`,
+                    "Revenue",
+                  ]}
+                />
+                <Bar
+                  dataKey="revenue"
+                  fill="#8b5cf6"
+                  radius={[6, 6, 0, 0]}
+                  barSize={32}
+                >
+                  {/* Dynamic coloring: highlight the highest revenue day */}
+                  {weeklyPatternChart.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.revenue > 40000 ? "#7c3aed" : "#a78bfa"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
 
@@ -214,7 +401,7 @@ export function AnalyticsContent({
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
-                  data={paymentMethods}
+                  data={paymentMethodsChart}
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
@@ -222,7 +409,7 @@ export function AnalyticsContent({
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {paymentMethods.map((entry, index) => (
+                  {paymentMethodsChart.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -230,7 +417,7 @@ export function AnalyticsContent({
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-4 space-y-2">
-              {paymentMethods.map((method, index) => (
+              {paymentMethodsChart.map((method, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between text-sm"
@@ -243,7 +430,9 @@ export function AnalyticsContent({
                     <span className="text-gray-700">{method.method}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-gray-500">{method.value}%</span>
+                    <span className="text-gray-500">
+                      {method.value.toFixed(1)}%
+                    </span>
                     <span className="text-gray-900 font-medium">
                       ৳{method.amount.toLocaleString()}
                     </span>
@@ -257,61 +446,161 @@ export function AnalyticsContent({
         {/* Discount Performance */}
         <div>
           <h4 className="text-gray-900 mb-4">Discount Code Performance</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-sm text-gray-500 border-b border-gray-200">
-                  <th className="pb-3 font-medium">Code</th>
-                  <th className="pb-3 font-medium">Uses</th>
-                  <th className="pb-3 font-medium">Revenue</th>
-                  <th className="pb-3 font-medium">Discount Given</th>
-                  <th className="pb-3 font-medium">ROI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {discountPerformance.map((disc, idx) => (
-                  <tr key={idx} className="text-sm border-b border-gray-100">
-                    <td className="py-3">
-                      <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                        {disc.code}
-                      </span>
-                    </td>
-                    <td className="py-3 text-gray-700">{disc.uses}</td>
-                    <td className="py-3 text-gray-900 font-medium">
-                      ৳{disc.revenue.toLocaleString()}
-                    </td>
-                    <td className="py-3 text-gray-700">
-                      ৳{disc.discount.toLocaleString()}
-                    </td>
-                    <td className="py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          disc.roi >= 5
-                            ? "bg-green-100 text-green-700"
-                            : "bg-orange-100 text-orange-700"
-                        }`}
-                      >
-                        {disc.roi.toFixed(1)}x
-                      </span>
-                    </td>
+          {discountPerformanceTable.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-gray-500 border-b border-gray-200">
+                    <th className="pb-3 font-medium">Code</th>
+                    <th className="pb-3 font-medium">Uses</th>
+                    <th className="pb-3 font-medium">Revenue</th>
+                    <th className="pb-3 font-medium">Discount Given</th>
+                    <th className="pb-3 font-medium">ROI</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {discountPerformanceTable.map((disc, idx) => (
+                    <tr key={idx} className="text-sm border-b border-gray-100">
+                      <td className="py-3">
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                          {disc.code}
+                        </span>
+                      </td>
+                      <td className="py-3 text-gray-700">{disc.uses}</td>
+                      <td className="py-3 text-gray-900 font-medium">
+                        ৳{disc.revenue.toLocaleString()}
+                      </td>
+                      <td className="py-3 text-gray-700">
+                        ৳{disc.discount.toLocaleString()}
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            disc.roi >= 5
+                              ? "bg-green-100 text-green-700"
+                              : "bg-orange-100 text-orange-700"
+                          }`}
+                        >
+                          {disc.roi.toFixed(1)}x
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>No discount code data available for the selected period.</p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   if (tab === "bookings") {
+    // Mock data for bookings tab (no API endpoints available yet)
+    const bookingVolumeTrendsData = [
+      { month: "Jul", bookings: 385, cancellations: 28, noShows: 12 },
+      { month: "Aug", bookings: 412, cancellations: 31, noShows: 15 },
+      { month: "Sep", bookings: 398, cancellations: 25, noShows: 10 },
+      { month: "Oct", bookings: 445, cancellations: 34, noShows: 14 },
+      { month: "Nov", bookings: 478, cancellations: 38, noShows: 16 },
+      { month: "Dec", bookings: 458, cancellations: 29, noShows: 11 },
+    ];
+
+    const timeSlotHeatMapData = [
+      {
+        day: "Mon",
+        "6AM": 2,
+        "9AM": 3,
+        "12PM": 2,
+        "3PM": 5,
+        "6PM": 8,
+        "9PM": 3,
+      },
+      {
+        day: "Tue",
+        "6AM": 2,
+        "9AM": 4,
+        "12PM": 3,
+        "3PM": 6,
+        "6PM": 9,
+        "9PM": 2,
+      },
+      {
+        day: "Wed",
+        "6AM": 1,
+        "9AM": 3,
+        "12PM": 2,
+        "3PM": 5,
+        "6PM": 7,
+        "9PM": 2,
+      },
+      {
+        day: "Thu",
+        "6AM": 3,
+        "9AM": 4,
+        "12PM": 3,
+        "3PM": 7,
+        "6PM": 9,
+        "9PM": 4,
+      },
+      {
+        day: "Fri",
+        "6AM": 2,
+        "9AM": 5,
+        "12PM": 4,
+        "3PM": 8,
+        "6PM": 10,
+        "9PM": 3,
+      },
+      {
+        day: "Sat",
+        "6AM": 4,
+        "9AM": 6,
+        "12PM": 5,
+        "3PM": 9,
+        "6PM": 10,
+        "9PM": 5,
+      },
+      {
+        day: "Sun",
+        "6AM": 3,
+        "9AM": 5,
+        "12PM": 4,
+        "3PM": 8,
+        "6PM": 9,
+        "9PM": 4,
+      },
+    ];
+
+    const fieldUtilizationData =
+      revenueByField.length > 0
+        ? revenueByField.map((item) => ({
+            field: item.field_name,
+            utilization: Math.min(
+              Math.round((item.total_bookings / 200) * 100),
+              100,
+            ),
+            capacity: 200,
+            actual: item.total_bookings,
+          }))
+        : [
+            { field: "Field A", utilization: 78, capacity: 200, actual: 156 },
+            { field: "Field B", utilization: 71, capacity: 200, actual: 142 },
+            { field: "Field C", utilization: 49, capacity: 200, actual: 98 },
+            { field: "Field D", utilization: 31, capacity: 200, actual: 62 },
+          ];
+
     return (
       <div className="space-y-6">
         {/* Booking Volume Trends */}
         <div>
           <h4 className="text-gray-900 mb-4">Booking Volume Trends</h4>
           <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={bookingVolumeTrends}>
+            <ComposedChart data={bookingVolumeTrendsData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
@@ -378,7 +667,7 @@ export function AnalyticsContent({
                 </tr>
               </thead>
               <tbody>
-                {timeSlotHeatMap.map((row, idx) => (
+                {timeSlotHeatMapData.map((row, idx) => (
                   <tr key={idx}>
                     <td className="text-sm text-gray-700 font-medium p-2">
                       {row.day}
@@ -411,7 +700,7 @@ export function AnalyticsContent({
         <div>
           <h4 className="text-gray-900 mb-4">Field Utilization Rates</h4>
           <div className="space-y-4">
-            {fieldUtilization.map((field, idx) => (
+            {fieldUtilizationData.map((field, idx) => (
               <div key={idx}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-gray-700 font-medium">
@@ -445,14 +734,36 @@ export function AnalyticsContent({
   }
 
   if (tab === "customers") {
+    // Mock data for customers tab (no API endpoints available yet)
+    const customerSegmentsData = [
+      { segment: "New", count: 142, percentage: 41, revenue: 35500 },
+      { segment: "Returning", count: 200, percentage: 59, revenue: 89500 },
+    ];
+
+    const bookingFrequencyData = [
+      { frequency: "1 time", customers: 85, color: "#3b82f6" },
+      { frequency: "2-5 times", customers: 142, color: "#8b5cf6" },
+      { frequency: "6-10 times", customers: 78, color: "#ec4899" },
+      { frequency: "10+ times", customers: 37, color: "#f97316" },
+    ];
+
+    const customerRetentionData = [
+      { month: "Jul", retained: 72, churned: 28 },
+      { month: "Aug", retained: 75, churned: 25 },
+      { month: "Sep", retained: 78, churned: 22 },
+      { month: "Oct", retained: 80, churned: 20 },
+      { month: "Nov", retained: 82, churned: 18 },
+      { month: "Dec", retained: 85, churned: 15 },
+    ];
+
     return (
       <div className="space-y-6">
         {/* Customer Segments */}
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
             <h4 className="text-gray-900 mb-4">New vs Returning Customers</h4>
             <div className="space-y-4">
-              {customerSegments.map((segment, idx) => (
+              {customerSegmentsData.map((segment, idx) => (
                 <div key={idx} className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-700 font-medium">
@@ -487,15 +798,136 @@ export function AnalyticsContent({
             </div>
           </div>
 
-          
+          <div>
+            <h4 className="text-gray-900 mb-4">
+              Booking Frequency Distribution
+            </h4>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={bookingFrequencyData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="customers"
+                >
+                  {bookingFrequencyData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="mt-4 space-y-2">
+              {bookingFrequencyData.map((freq, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: freq.color }}
+                    />
+                    <span className="text-gray-700">{freq.frequency}</span>
+                  </div>
+                  <span className="text-gray-900 font-medium">
+                    {freq.customers} customers
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        
+        {/* Customer Retention */}
+        <div>
+          <h4 className="text-gray-900 mb-4">Customer Retention Trends</h4>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={customerRetentionData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" />
+              <Tooltip />
+              <Legend />
+              <Bar
+                dataKey="retained"
+                stackId="a"
+                fill="#10b981"
+                name="Retained"
+                radius={[8, 8, 0, 0]}
+              />
+              <Bar
+                dataKey="churned"
+                stackId="a"
+                fill="#ef4444"
+                name="Churned"
+                radius={[8, 8, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="bg-green-50 rounded-lg p-4">
+              <p className="text-xs text-green-600 mb-1">Avg. Retention Rate</p>
+              <p className="text-2xl text-green-900 font-semibold">77%</p>
+              <p className="text-xs text-green-600 mt-1">
+                ↑ 6.8% vs last period
+              </p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4">
+              <p className="text-xs text-purple-600 mb-1">
+                Customer Lifetime Value
+              </p>
+              <p className="text-2xl text-purple-900 font-semibold">৳3,840</p>
+              <p className="text-xs text-purple-600 mt-1">
+                Based on avg. 8 bookings
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   // Operations Tab
+  const revenueByFieldChart =
+    revenueByField.length > 0
+      ? revenueByField.map((item) => ({
+          field: item.field_name,
+          revenue: item.total_revenue,
+          bookings: item.total_bookings,
+          avgValue:
+            item.total_bookings > 0
+              ? Math.round(item.total_revenue / item.total_bookings)
+              : 0,
+        }))
+      : [
+          { field: "Field A", revenue: 45000, bookings: 156, avgValue: 288 },
+          { field: "Field B", revenue: 38000, bookings: 142, avgValue: 268 },
+          { field: "Field C", revenue: 28000, bookings: 98, avgValue: 286 },
+          { field: "Field D", revenue: 14000, bookings: 62, avgValue: 226 },
+        ];
+
+  const fieldUtilizationChart =
+    revenueByField.length > 0
+      ? revenueByField.map((item) => ({
+          field: item.field_name,
+          utilization: Math.min(
+            Math.round((item.total_bookings / 200) * 100),
+            100,
+          ),
+          capacity: 200,
+          actual: item.total_bookings,
+        }))
+      : [
+          { field: "Field A", utilization: 78, capacity: 200, actual: 156 },
+          { field: "Field B", utilization: 71, capacity: 200, actual: 142 },
+          { field: "Field C", utilization: 49, capacity: 200, actual: 98 },
+          { field: "Field D", utilization: 31, capacity: 200, actual: 62 },
+        ];
+
   return (
     <div className="space-y-6">
       {/* Field Performance Comparison */}
@@ -514,8 +946,8 @@ export function AnalyticsContent({
               </tr>
             </thead>
             <tbody>
-              {revenueByField.map((field, idx) => {
-                const util = fieldUtilization.find(
+              {revenueByFieldChart.map((field, idx) => {
+                const util = fieldUtilizationChart.find(
                   (f) => f.field === field.field,
                 );
                 return (
@@ -547,7 +979,7 @@ export function AnalyticsContent({
                           ⭐ Top Performer
                         </span>
                       )}
-                      {idx === revenueByField.length - 1 && (
+                      {idx === revenueByFieldChart.length - 1 && (
                         <span className="text-orange-600 text-xs">
                           📊 Needs Attention
                         </span>
@@ -561,6 +993,44 @@ export function AnalyticsContent({
         </div>
       </div>
 
+      {/* Key Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-100">
+          <div className="flex items-center justify-between mb-2">
+            <Zap className="w-5 h-5 text-blue-600" />
+            <span className="text-xs text-blue-600 font-medium">↑ 12%</span>
+          </div>
+          <p className="text-xs text-blue-600 mb-1">Avg. Booking Value</p>
+          <p className="text-2xl text-blue-900 font-semibold">৳273</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
+          <div className="flex items-center justify-between mb-2">
+            <Clock className="w-5 h-5 text-purple-600" />
+            <span className="text-xs text-purple-600 font-medium">Avg</span>
+          </div>
+          <p className="text-xs text-purple-600 mb-1">Booking Lead Time</p>
+          <p className="text-2xl text-purple-900 font-semibold">2.4 days</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
+          <div className="flex items-center justify-between mb-2">
+            <CreditCard className="w-5 h-5 text-green-600" />
+            <span className="text-xs text-green-600 font-medium">↑ 8%</span>
+          </div>
+          <p className="text-xs text-green-600 mb-1">Payment Collection</p>
+          <p className="text-2xl text-green-900 font-semibold">94%</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 border border-orange-100">
+          <div className="flex items-center justify-between mb-2">
+            <Target className="w-5 h-5 text-orange-600" />
+            <span className="text-xs text-orange-600 font-medium">Overall</span>
+          </div>
+          <p className="text-xs text-orange-600 mb-1">Avg. Utilization</p>
+          <p className="text-2xl text-orange-900 font-semibold">57%</p>
+        </div>
+      </div>
 
       {/* Peak Performance Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
