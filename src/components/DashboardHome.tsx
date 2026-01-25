@@ -124,7 +124,8 @@ export function DashboardHome() {
         ]);
 
       // Debugging Log
-      
+      console.log('Payment Methods Distribution:', payments);
+      console.log('Discount Code Performance:', discounts);
 
       // Update States
       setApiData(trendRes);

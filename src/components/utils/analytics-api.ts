@@ -102,6 +102,15 @@ export interface DiscountCodePerformanceItem {
   roi_percentage: number;
 }
 
+
+export interface PaymentChartData {
+  method: string;
+  value: number;
+  color: string;
+  amount: number;
+  bookings: number; 
+}
+
 // API Functions
 
 /**
@@ -192,44 +201,46 @@ export interface DiscountCodePerformanceItem {
  * Get payment methods distribution
  * Returns breakdown of payment methods used
  */
-export const getPaymentMethodsDistribution = async (
-  startDate: string,
-  endDate: string
-): Promise<PaymentMethodItem[]> => {
-  try {
-    const url = `${BASE_URL}/get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`;
-    const response = await fetch(url, { headers: getHeaders() });
+// export const getPaymentMethodsDistribution = async (
+//   startDate: string,
+//   endDate: string
+// ): Promise<PaymentMethodItem[]> => {
+//   try {
+//     const url = `${BASE_URL}/get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`;
+//     const response = await fetch(url, { headers: getHeaders() });
     
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
-    }
+//     if (!response.ok) {
+//       throw new Error(`API Error: ${response.status}`);
+//     }
     
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching payment methods distribution:', error);
-    return [];
-  }
-};
-
+//     return await response.json();
+//     const payments = await response.json();
+//     console.log('Payment Methods Distribution:', payments);
+//     return payments;
+//   } catch (error) {
+//     console.error('Error fetching payment methods distribution:', error);
+//     return [];
+//   }
+// };
 /**
  * Get discount code performance
  * Returns performance metrics for discount codes
  */
-export const getDiscountCodePerformance = async (
-  startDate: string,
-  endDate: string
-): Promise<DiscountCodePerformanceItem[]> => {
-  try {
-    const url = `${BASE_URL}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`;
-    const response = await fetch(url, { headers: getHeaders() });
+// export const getDiscountCodePerformance = async (
+//   startDate: string,
+//   endDate: string
+// ): Promise<DiscountCodePerformanceItem[]> => {
+//   try {
+//     const url = `${BASE_URL}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`;
+//     const response = await fetch(url, { headers: getHeaders() });
     
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
-    }
+//     if (!response.ok) {
+//       throw new Error(`API Error: ${response.status}`);
+//     }
     
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching discount code performance:', error);
-    return [];
-  }
-};
+//     return await response.json();
+//   } catch (error) {
+//     console.error('Error fetching discount code performance:', error);
+//     return [];
+//   }
+// };

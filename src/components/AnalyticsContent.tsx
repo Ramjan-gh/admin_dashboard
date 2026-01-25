@@ -23,6 +23,7 @@ import {
   type PaymentMethodItem,
   type DiscountCodePerformanceItem,
   type RevenueByTimeSlotItem,
+  type PaymentChartData,
 } from "../../src/components/utils/analytics-api";
 
 interface AnalyticsContentProps {
@@ -95,7 +96,7 @@ export function AnalyticsContent({
         }));
     }, [revenueByDayOfWeek]);
 
-    const paymentMethodsChart =
+    const paymentMethodsChart: PaymentChartData[] =
       paymentMethods.length > 0
         ? paymentMethods.map((item, index) => {
             const colors = ["#ec4899", "#8b5cf6", "#3b82f6", "#f97316"];
@@ -106,13 +107,11 @@ export function AnalyticsContent({
               value: item.percentage,
               color: colors[index % colors.length],
               amount: item.total_amount,
+              bookings: item.total_bookings,
             };
           })
         : [
-            { method: "bKash", value: 42, color: "#ec4899", amount: 52500 },
-            { method: "Nagad", value: 28, color: "#8b5cf6", amount: 35000 },
-            { method: "Card", value: 18, color: "#3b82f6", amount: 22500 },
-            { method: "Cash", value: 12, color: "#f97316", amount: 15000 },
+            
           ];
 
     const discountPerformanceTable =
@@ -406,7 +405,7 @@ export function AnalyticsContent({
                   cy="50%"
                   innerRadius={50}
                   outerRadius={80}
-                  paddingAngle={5}
+                  paddingAngle={0}
                   dataKey="value"
                 >
                   {paymentMethodsChart.map((entry, index) => (
@@ -428,6 +427,9 @@ export function AnalyticsContent({
                       style={{ backgroundColor: method.color }}
                     />
                     <span className="text-gray-700">{method.method}</span>
+                  </div>
+                  <div>
+                    <p>Total Booking: {method.bookings}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-gray-500">
