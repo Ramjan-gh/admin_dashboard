@@ -81,7 +81,7 @@ export function DashboardHome() {
       }
 
       // Step C: Fetch all analytics data in parallel
-      const [trendRes, fields, weekly, slots, payments, discounts] =
+      const [trendRes, fields, weekly, slots, payments, discounts, bookingVolume] =
         await Promise.all([
           fetch(
             `${baseUrl}/get_revenue_trend?start_date=${startDate}&end_date=${endDate}`,
@@ -121,11 +121,15 @@ export function DashboardHome() {
             `${baseUrl}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`,
             { headers },
           ).then((res) => (res.ok ? res.json() : [])),
+          fetch(
+            `${baseUrl}/get_booking_volume_trends?start_date=${startDate}&end_date=${endDate}`,
+            { headers },
+          ).then((res) => (res.ok ? res.json() : [])),
         ]);
 
       // Debugging Log
-      console.log('Payment Methods Distribution:', payments);
-      console.log('Discount Code Performance:', discounts);
+      console.log("booking volume trend data:", bookingVolume);
+
 
       // Update States
       setApiData(trendRes);
@@ -136,6 +140,7 @@ export function DashboardHome() {
         revenueByTimeSlot: slots,
         paymentMethods: payments,
         discountPerformance: discounts,
+        bookingVolumeTrends: bookingVolume,
       }));
     } catch (err: any) {
       console.error("Full Data Sync Error:", err);

@@ -111,6 +111,12 @@ export interface PaymentChartData {
   bookings: number; 
 }
 
+export interface BookingVolumeData {
+  booking_date: string;
+  total_bookings: number;
+  cancelled_bookings: number;
+}
+
 // API Functions
 
 /**

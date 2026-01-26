@@ -14,6 +14,8 @@ import {
   Line,
   ComposedChart,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts";
 import { Zap, Clock, CreditCard, Target } from "lucide-react";
 import {
@@ -24,7 +26,9 @@ import {
   type DiscountCodePerformanceItem,
   type RevenueByTimeSlotItem,
   type PaymentChartData,
+  type BookingVolumeData,
 } from "../../src/components/utils/analytics-api";
+import { b } from "framer-motion/dist/types.d-a9pt5qxk";
 
 interface AnalyticsContentProps {
   tab: "revenue" | "bookings" | "customers" | "operations";
@@ -33,7 +37,7 @@ interface AnalyticsContentProps {
   revenueByTimeSlot: RevenueByTimeSlotItem[];
   revenueByDayOfWeek: WeeklyRevenuePatternItem[];
   paymentMethods: PaymentMethodItem[];
-  bookingVolumeTrends: WeeklyRevenuePatternItem[];
+  bookingVolumeTrends: BookingVolumeData[];
   timeSlotHeatMap: WeeklyRevenuePatternItem[];
   fieldUtilization: RevenueByFieldItem[];
   customerSegments: RevenueByFieldItem[];
@@ -110,9 +114,7 @@ export function AnalyticsContent({
               bookings: item.total_bookings,
             };
           })
-        : [
-            
-          ];
+        : [];
 
     const discountPerformanceTable =
       discountPerformance.length > 0
@@ -123,36 +125,7 @@ export function AnalyticsContent({
             discount: item.total_discount_given,
             roi: item.roi_percentage / 100,
           }))
-        : [
-            {
-              code: "WEEKEND20",
-              uses: 86,
-              revenue: 18200,
-              discount: 4550,
-              roi: 4.0,
-            },
-            {
-              code: "NEWUSER15",
-              uses: 142,
-              revenue: 28400,
-              discount: 4980,
-              roi: 5.7,
-            },
-            {
-              code: "HOLIDAY25",
-              uses: 54,
-              revenue: 12150,
-              discount: 4050,
-              roi: 3.0,
-            },
-            {
-              code: "FLASH10",
-              uses: 98,
-              revenue: 22050,
-              discount: 2450,
-              roi: 9.0,
-            },
-          ];
+        : [];
 
     // Mock data for time slot analysis (no API endpoint for this yet)
     const revenueByTimeSlotData =
@@ -182,6 +155,14 @@ export function AnalyticsContent({
         : [
             /* Your fallback mock data stays here */
           ];
+
+    const bookingVolumeTable = bookingVolumeTrends.map((item) => ({
+      bookingDate: item.booking_date,
+      totalBookings: item.total_bookings,
+      cancelledBookings: item.cancelled_bookings,
+    }));
+
+    
 
     return (
       <div className="space-y-24">
@@ -503,14 +484,21 @@ export function AnalyticsContent({
 
   if (tab === "bookings") {
     // Mock data for bookings tab (no API endpoints available yet)
-    const bookingVolumeTrendsData = [
-      { month: "Jul", bookings: 385, cancellations: 28, noShows: 12 },
-      { month: "Aug", bookings: 412, cancellations: 31, noShows: 15 },
-      { month: "Sep", bookings: 398, cancellations: 25, noShows: 10 },
-      { month: "Oct", bookings: 445, cancellations: 34, noShows: 14 },
-      { month: "Nov", bookings: 478, cancellations: 38, noShows: 16 },
-      { month: "Dec", bookings: 458, cancellations: 29, noShows: 11 },
-    ];
+    const bookingVolumeTrendsData =
+      bookingVolumeTrends.length > 0
+        ? bookingVolumeTrends.map((item) => ({
+            date: item.booking_date,
+            bookings: item.total_bookings,
+            cancellations: item.cancelled_bookings,
+          }))
+        : [
+            { month: "Jan", bookings: 400, cancellations: 30, noShows: 12 },
+            { month: "Feb", bookings: 380, cancellations: 28, noShows: 11 },
+            { month: "Mar", bookings: 450, cancellations: 35, noShows: 14 },
+            { month: "Apr", bookings: 500, cancellations: 40, noShows: 15 },
+            { month: "May", bookings: 480, cancellations: 32, noShows: 13 },
+            { month: "Jun", bookings: 520, cancellations: 38, noShows: 16 },
+          ];
 
     const timeSlotHeatMapData = [
       {
@@ -578,6 +566,34 @@ export function AnalyticsContent({
       },
     ];
 
+    const stats = React.useMemo(() => {
+      if (!bookingVolumeTrendsData || bookingVolumeTrendsData.length === 0) {
+        return { avgBookings: 0, avgCancelRate: 0 };
+      }
+
+      const totalBookings = bookingVolumeTrendsData.reduce(
+        (sum, item) => sum + (item.bookings || 0),
+        0,
+      );
+      const totalCancellations = bookingVolumeTrendsData.reduce(
+        (sum, item) => sum + (item.cancellations || 0),
+        0,
+      );
+
+      const avgBookings = Math.round(
+        totalBookings / bookingVolumeTrendsData.length,
+      );
+
+      // Calculate rate: (Total Cancellations / Total Bookings) * 100
+      const avgCancelRate =
+        totalBookings > 0
+          ? ((totalCancellations / totalBookings) * 100).toFixed(1)
+          : 0;
+
+      return { avgBookings, avgCancelRate };
+    }, [bookingVolumeTrendsData]);
+    
+
     const fieldUtilizationData =
       revenueByField.length > 0
         ? revenueByField.map((item) => ({
@@ -598,53 +614,126 @@ export function AnalyticsContent({
 
     return (
       <div className="space-y-6">
-        {/* Booking Volume Trends */}
-        <div>
-          <h4 className="text-gray-900 mb-4">Booking Volume Trends</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={bookingVolumeTrendsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip />
-              <Legend />
-              <Bar
-                dataKey="bookings"
-                fill="#3b82f6"
-                name="Bookings"
-                radius={[8, 8, 0, 0]}
+        <h4 className="text-gray-900 mb-4 font-medium">
+          Booking Volume Trends
+        </h4>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={bookingVolumeTrendsData}>
+              <defs>
+                {/* Booking Gradient - Blue */}
+                <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+                {/* Cancellations Gradient - Orange */}
+                <linearGradient
+                  id="colorCancellations"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.1} />
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#f3f4f6"
               />
-              <Line
+
+              <XAxis
+                dataKey="date" // Ensure this matches your data key for the date
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                stroke="#9ca3af"
+                dy={10}
+                tickFormatter={(str) => {
+                  const date = new Date(str);
+                  if (isNaN(date.getTime())) return str; // Fallback if string isn't a date
+                  return date.toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                  });
+                }}
+              />
+
+              <YAxis
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                stroke="#9ca3af"
+                dx={-10}
+              />
+
+              <Tooltip
+                labelFormatter={(value) => {
+                  const date = new Date(value);
+                  return isNaN(date.getTime())
+                    ? value
+                    : date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "2-digit",
+                        year: "numeric",
+                      });
+                }}
+                contentStyle={{
+                  borderRadius: "12px",
+                  border: "none",
+                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+                }}
+              />
+
+              <Legend
+                verticalAlign="top"
+                align="right"
+                height={36}
+                iconType="circle"
+              />
+
+              <Area
+                type="monotone"
+                dataKey="bookings"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorBookings)"
+                name="Bookings"
+              />
+              <Area
                 type="monotone"
                 dataKey="cancellations"
                 stroke="#f97316"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#colorCancellations)"
                 name="Cancellations"
-                strokeWidth={2}
               />
-              <Line
-                type="monotone"
-                dataKey="noShows"
-                stroke="#ef4444"
-                name="No-Shows"
-                strokeWidth={2}
-              />
-            </ComposedChart>
+            </AreaChart>
           </ResponsiveContainer>
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <p className="text-xs text-blue-600 mb-1">Avg. Bookings/Month</p>
-              <p className="text-2xl text-blue-900 font-semibold">429</p>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-4">
-              <p className="text-xs text-orange-600 mb-1">
-                Avg. Cancellation Rate
-              </p>
-              <p className="text-2xl text-orange-900 font-semibold">7.2%</p>
-            </div>
-            <div className="bg-red-50 rounded-lg p-4">
-              <p className="text-xs text-red-600 mb-1">Avg. No-Show Rate</p>
-              <p className="text-2xl text-red-900 font-semibold">3.1%</p>
-            </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="mt-6 grid grid-cols-2 gap-4">
+          <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+            <p className="text-xs text-blue-600 mb-1 font-medium">
+              Avg. Bookings/Day
+            </p>
+            <p className="text-2xl text-blue-900 font-bold">
+              {stats.avgBookings}
+            </p>
+          </div>
+          <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100">
+            <p className="text-xs text-orange-600 mb-1 font-medium">
+              Avg. Cancellation Rate
+            </p>
+            <p className="text-2xl text-orange-900 font-bold">
+              {stats.avgCancelRate}%
+            </p>
           </div>
         </div>
 
@@ -799,95 +888,6 @@ export function AnalyticsContent({
               ))}
             </div>
           </div>
-
-          <div>
-            <h4 className="text-gray-900 mb-4">
-              Booking Frequency Distribution
-            </h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={bookingFrequencyData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="customers"
-                >
-                  {bookingFrequencyData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-4 space-y-2">
-              {bookingFrequencyData.map((freq, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: freq.color }}
-                    />
-                    <span className="text-gray-700">{freq.frequency}</span>
-                  </div>
-                  <span className="text-gray-900 font-medium">
-                    {freq.customers} customers
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Customer Retention */}
-        <div>
-          <h4 className="text-gray-900 mb-4">Customer Retention Trends</h4>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={customerRetentionData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip />
-              <Legend />
-              <Bar
-                dataKey="retained"
-                stackId="a"
-                fill="#10b981"
-                name="Retained"
-                radius={[8, 8, 0, 0]}
-              />
-              <Bar
-                dataKey="churned"
-                stackId="a"
-                fill="#ef4444"
-                name="Churned"
-                radius={[8, 8, 0, 0]}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="mt-4 grid grid-cols-2 gap-4">
-            <div className="bg-green-50 rounded-lg p-4">
-              <p className="text-xs text-green-600 mb-1">Avg. Retention Rate</p>
-              <p className="text-2xl text-green-900 font-semibold">77%</p>
-              <p className="text-xs text-green-600 mt-1">
-                ↑ 6.8% vs last period
-              </p>
-            </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <p className="text-xs text-purple-600 mb-1">
-                Customer Lifetime Value
-              </p>
-              <p className="text-2xl text-purple-900 font-semibold">৳3,840</p>
-              <p className="text-xs text-purple-600 mt-1">
-                Based on avg. 8 bookings
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -1004,33 +1004,6 @@ export function AnalyticsContent({
           </div>
           <p className="text-xs text-blue-600 mb-1">Avg. Booking Value</p>
           <p className="text-2xl text-blue-900 font-semibold">৳273</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
-          <div className="flex items-center justify-between mb-2">
-            <Clock className="w-5 h-5 text-purple-600" />
-            <span className="text-xs text-purple-600 font-medium">Avg</span>
-          </div>
-          <p className="text-xs text-purple-600 mb-1">Booking Lead Time</p>
-          <p className="text-2xl text-purple-900 font-semibold">2.4 days</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-100">
-          <div className="flex items-center justify-between mb-2">
-            <CreditCard className="w-5 h-5 text-green-600" />
-            <span className="text-xs text-green-600 font-medium">↑ 8%</span>
-          </div>
-          <p className="text-xs text-green-600 mb-1">Payment Collection</p>
-          <p className="text-2xl text-green-900 font-semibold">94%</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 border border-orange-100">
-          <div className="flex items-center justify-between mb-2">
-            <Target className="w-5 h-5 text-orange-600" />
-            <span className="text-xs text-orange-600 font-medium">Overall</span>
-          </div>
-          <p className="text-xs text-orange-600 mb-1">Avg. Utilization</p>
-          <p className="text-2xl text-orange-900 font-semibold">57%</p>
         </div>
       </div>
 
