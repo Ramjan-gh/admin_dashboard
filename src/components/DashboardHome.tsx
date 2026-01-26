@@ -81,54 +81,78 @@ export function DashboardHome() {
       }
 
       // Step C: Fetch all analytics data in parallel
-      const [trendRes, fields, weekly, slots, payments, discounts, bookingVolume] =
-        await Promise.all([
-          fetch(
-            `${baseUrl}/get_revenue_trend?start_date=${startDate}&end_date=${endDate}`,
-            { headers },
-          ).then((res) => (res.ok ? res.json() : [])),
+      const [
+        trendRes,
+        fields,
+        weekly,
+        slots,
+        payments,
+        discounts,
+        bookingVolume,
+        timeSlotHeatMap,
+        fieldUtilization,
+      ] = await Promise.all([
+        fetch(
+          `${baseUrl}/get_revenue_trend?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
 
-          fetch(
-            `${baseUrl}/get_revenue_by_field?start_date=${startDate}&end_date=${endDate}`,
-            { headers },
-          ).then((res) => (res.ok ? res.json() : [])),
+        fetch(
+          `${baseUrl}/get_revenue_by_field?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
 
-          fetch(
-            `${baseUrl}/get_weekly_revenue_pattern?weeks_to_analyze=${weeksToAnalyze}`,
-            {
-              headers,
-            },
-          ).then((res) => (res.ok ? res.json() : [])),
+        fetch(
+          `${baseUrl}/get_weekly_revenue_pattern?weeks_to_analyze=${weeksToAnalyze}`,
+          {
+            headers,
+          },
+        ).then((res) => (res.ok ? res.json() : [])),
 
-          fetch(
-            `${baseUrl}/get_revenue_by_time_slot?p_field_id=${activeFieldId}&start_date=${startDate}&end_date=${endDate}`,
-            { headers },
-          ).then(async (res) => {
-            if (!res.ok) {
-              const err = await res.json();
-              console.error("❌ Time Slot API Error:", err);
-              return [];
-            }
-            return res.json();
-          }),
+        fetch(
+          `${baseUrl}/get_revenue_by_time_slot?p_field_id=${activeFieldId}&start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then(async (res) => {
+          if (!res.ok) {
+            const err = await res.json();
+            console.error("❌ Time Slot API Error:", err);
+            return [];
+          }
+          return res.json();
+        }),
 
-          fetch(
-            `${baseUrl}/get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`,
-            { headers },
-          ).then((res) => (res.ok ? res.json() : [])),
+        fetch(
+          `${baseUrl}/get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
 
-          fetch(
-            `${baseUrl}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`,
-            { headers },
-          ).then((res) => (res.ok ? res.json() : [])),
-          fetch(
-            `${baseUrl}/get_booking_volume_trends?start_date=${startDate}&end_date=${endDate}`,
-            { headers },
-          ).then((res) => (res.ok ? res.json() : [])),
-        ]);
+        fetch(
+          `${baseUrl}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
+        fetch(
+          `${baseUrl}/get_booking_volume_trends?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
+        fetch(
+          `${baseUrl}/get_popular_time_slots_heatmap?p_field_id=${activeFieldId}&start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then(async (res) => {
+          if (!res.ok) {
+            const err = await res.json();
+            console.error("❌ Popular Time Slots API Error:", err);
+            return [];
+          }
+          return res.json();
+        }),
+        fetch(
+          `${baseUrl}/get_field_utilization_rates?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
+      ]);
 
       // Debugging Log
-      console.log("booking volume trend data:", bookingVolume);
+      console.log("revenue trend:", trendRes);
 
 
       // Update States
@@ -141,6 +165,8 @@ export function DashboardHome() {
         paymentMethods: payments,
         discountPerformance: discounts,
         bookingVolumeTrends: bookingVolume,
+        timeSlotHeatMap: timeSlotHeatMap,
+        fieldUtilization: fieldUtilization,
       }));
     } catch (err: any) {
       console.error("Full Data Sync Error:", err);

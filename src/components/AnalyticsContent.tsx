@@ -27,6 +27,8 @@ import {
   type RevenueByTimeSlotItem,
   type PaymentChartData,
   type BookingVolumeData,
+  type TimeSlotHeatMapItem,
+  type FieldUtilizationItem,
 } from "../../src/components/utils/analytics-api";
 import { b } from "framer-motion/dist/types.d-a9pt5qxk";
 
@@ -38,8 +40,8 @@ interface AnalyticsContentProps {
   revenueByDayOfWeek: WeeklyRevenuePatternItem[];
   paymentMethods: PaymentMethodItem[];
   bookingVolumeTrends: BookingVolumeData[];
-  timeSlotHeatMap: WeeklyRevenuePatternItem[];
-  fieldUtilization: RevenueByFieldItem[];
+  timeSlotHeatMap: TimeSlotHeatMapItem[];
+  fieldUtilization: FieldUtilizationItem[];
   customerSegments: RevenueByFieldItem[];
   customerRetention: RevenueByFieldItem[];
   bookingFrequency: RevenueByFieldItem[];
@@ -161,8 +163,6 @@ export function AnalyticsContent({
       totalBookings: item.total_bookings,
       cancelledBookings: item.cancelled_bookings,
     }));
-
-    
 
     return (
       <div className="space-y-24">
@@ -500,71 +500,20 @@ export function AnalyticsContent({
             { month: "Jun", bookings: 520, cancellations: 38, noShows: 16 },
           ];
 
-    const timeSlotHeatMapData = [
-      {
-        day: "Mon",
-        "6AM": 2,
-        "9AM": 3,
-        "12PM": 2,
-        "3PM": 5,
-        "6PM": 8,
-        "9PM": 3,
-      },
-      {
-        day: "Tue",
-        "6AM": 2,
-        "9AM": 4,
-        "12PM": 3,
-        "3PM": 6,
-        "6PM": 9,
-        "9PM": 2,
-      },
-      {
-        day: "Wed",
-        "6AM": 1,
-        "9AM": 3,
-        "12PM": 2,
-        "3PM": 5,
-        "6PM": 7,
-        "9PM": 2,
-      },
-      {
-        day: "Thu",
-        "6AM": 3,
-        "9AM": 4,
-        "12PM": 3,
-        "3PM": 7,
-        "6PM": 9,
-        "9PM": 4,
-      },
-      {
-        day: "Fri",
-        "6AM": 2,
-        "9AM": 5,
-        "12PM": 4,
-        "3PM": 8,
-        "6PM": 10,
-        "9PM": 3,
-      },
-      {
-        day: "Sat",
-        "6AM": 4,
-        "9AM": 6,
-        "12PM": 5,
-        "3PM": 9,
-        "6PM": 10,
-        "9PM": 5,
-      },
-      {
-        day: "Sun",
-        "6AM": 3,
-        "9AM": 5,
-        "12PM": 4,
-        "3PM": 8,
-        "6PM": 9,
-        "9PM": 4,
-      },
-    ];
+          
+
+    const timeSlotHeatMapData =
+      timeSlotHeatMap.length > 0
+        ? timeSlotHeatMap.map((item) => ({
+            day: item.day_name,
+            timeSlot: `${item.start_time.slice(0, 5)} - ${item.end_time.slice(0, 5)}`,
+            bookings: item.booking_count,
+            revenue: item.total_revenue,
+            utilization: item.utilization_rate,
+          }))
+        : [
+            /* Your fallback mock data stays here */
+          ];
 
     const stats = React.useMemo(() => {
       if (!bookingVolumeTrendsData || bookingVolumeTrendsData.length === 0) {
@@ -592,24 +541,20 @@ export function AnalyticsContent({
 
       return { avgBookings, avgCancelRate };
     }, [bookingVolumeTrendsData]);
-    
 
     const fieldUtilizationData =
-      revenueByField.length > 0
-        ? revenueByField.map((item) => ({
+      fieldUtilization.length > 0
+        ? fieldUtilization.map((item) => ({
             field: item.field_name,
             utilization: Math.min(
-              Math.round((item.total_bookings / 200) * 100),
+              Math.round((item.utilization_rate / 100) * 100),
               100,
             ),
-            capacity: 200,
-            actual: item.total_bookings,
+            capacity: item.total_possible_bookings,
+            actual: item.actual_bookings,
           }))
         : [
-            { field: "Field A", utilization: 78, capacity: 200, actual: 156 },
-            { field: "Field B", utilization: 71, capacity: 200, actual: 142 },
-            { field: "Field C", utilization: 49, capacity: 200, actual: 98 },
-            { field: "Field D", utilization: 31, capacity: 200, actual: 62 },
+            /* Your fallback mock data stays here */
           ];
 
     return (
@@ -737,87 +682,191 @@ export function AnalyticsContent({
           </div>
         </div>
 
-        {/* Time Slot Heat Map */}
-        <div>
-          <h4 className="text-gray-900 mb-4">Popular Time Slots (Heat Map)</h4>
+        {/* Time Slot Heat Map Section */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h4 className="text-gray-900 font-semibold text-lg">
+              Popular Time Slots (Heat Map)
+            </h4>
+
+            {/* Dynamic Field Dropdown */}
+            <div className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100 transition-all hover:bg-purple-100">
+              <span className="text-[10px] uppercase font-bold text-purple-400">
+                Select Field:
+              </span>
+              <select
+                value={currentFieldId}
+                onChange={(e) => onFieldChange(e.target.value)}
+                className="bg-transparent text-sm font-semibold text-purple-700 focus:ring-0 border-none p-0 cursor-pointer outline-none"
+              >
+                {fieldsList.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-left text-sm text-gray-500 font-medium p-2">
-                    Day
-                  </th>
-                  {["6AM", "9AM", "12PM", "3PM", "6PM", "9PM"].map((time) => (
-                    <th
-                      key={time}
-                      className="text-center text-sm text-gray-500 font-medium p-2"
-                    >
-                      {time}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {timeSlotHeatMapData.map((row, idx) => (
-                  <tr key={idx}>
-                    <td className="text-sm text-gray-700 font-medium p-2">
-                      {row.day}
-                    </td>
-                    {["6AM", "9AM", "12PM", "3PM", "6PM", "9PM"].map((time) => {
-                      const value = row[time as keyof typeof row] as number;
-                      const intensity = value / 10;
+            {(() => {
+              // Logic for table headers and data normalization
+              const uniqueTimeSlots = Array.from(
+                new Set(timeSlotHeatMapData.map((d) => d.timeSlot)),
+              ).sort();
+              const uniqueDays = [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday",
+              ];
+              const maxBookings = Math.max(
+                ...timeSlotHeatMapData.map((d) => d.bookings),
+                1,
+              );
+
+              return (
+                <table className="w-full border-separate border-spacing-1">
+                  <thead>
+                    <tr>
+                      <th className="text-left text-xs text-gray-400 uppercase font-bold p-2 w-24 tracking-wider">
+                        Day
+                      </th>
+                      {uniqueTimeSlots.map((time) => (
+                        <th
+                          key={time}
+                          className="text-center text-xs text-gray-400 uppercase font-bold p-2 tracking-wider"
+                        >
+                          {time}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {uniqueDays.map((day) => {
+                      const dayData = timeSlotHeatMapData.filter(
+                        (d) => d.day === day,
+                      );
+                      if (dayData.length === 0) return null;
+
                       return (
-                        <td key={time} className="p-2">
-                          <div
-                            className="w-full h-12 rounded flex items-center justify-center text-sm font-medium"
-                            style={{
-                              backgroundColor: `rgba(139, 92, 246, ${intensity})`,
-                              color: intensity > 0.5 ? "white" : "#6b7280",
-                            }}
-                          >
-                            {value}
-                          </div>
-                        </td>
+                        <tr key={day}>
+                          <td className="text-sm text-gray-600 font-semibold p-2">
+                            {day}
+                          </td>
+                          {uniqueTimeSlots.map((slot) => {
+                            const entry = dayData.find(
+                              (d) => d.timeSlot === slot,
+                            );
+                            const value = entry ? entry.bookings : 0;
+                            const intensity = value / maxBookings;
+
+                            return (
+                              <td key={slot} className="p-0.5">
+                                <div
+                                  className="w-full h-14 rounded-lg flex flex-col items-center justify-center transition-all duration-200 hover:scale-[1.05] hover:shadow-md cursor-default border border-white/20"
+                                  style={{
+                                    backgroundColor: `rgba(139, 92, 246, ${Math.max(intensity, 0.05)})`,
+                                    color:
+                                      intensity > 0.4 ? "white" : "#4b5563",
+                                  }}
+                                >
+                                  <span className="text-sm font-bold">
+                                    {value}
+                                  </span>
+                                  {entry?.utilization && (
+                                    <span
+                                      className={`text-[9px] ${intensity > 0.4 ? "text-purple-100" : "text-gray-400"}`}
+                                    >
+                                      {entry.utilization}%
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
                       );
                     })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+
+          {/* Legend for Heat Intensity */}
+          <div className="mt-4 flex items-center justify-end gap-2 text-[10px] text-gray-400 font-bold uppercase">
+            <span>Low</span>
+            <div className="flex gap-1">
+              {[0.1, 0.3, 0.6, 0.9].map((op) => (
+                <div
+                  key={op}
+                  className="w-3 h-3 rounded-sm"
+                  style={{ backgroundColor: `rgba(139, 92, 246, ${op})` }}
+                />
+              ))}
+            </div>
+            <span>High Demand</span>
           </div>
         </div>
 
-        {/* Field Utilization */}
-        <div>
-          <h4 className="text-gray-900 mb-4">Field Utilization Rates</h4>
-          <div className="space-y-4">
-            {fieldUtilizationData.map((field, idx) => (
-              <div key={idx}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-700 font-medium">
-                    {field.field}
-                  </span>
-                  <span className="text-sm text-gray-500">
-                    {field.actual}/{field.capacity} bookings (
-                    {field.utilization}%)
-                  </span>
+        {/* Field Utilization Section */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <h4 className="text-gray-900 mb-6 font-semibold flex items-center gap-2">
+            Field Utilization Rates
+            {fieldUtilizationData.length === 0 && (
+              <span className="text-xs font-normal text-gray-400">
+                (No data available)
+              </span>
+            )}
+          </h4>
+
+          <div className="space-y-6">
+            {fieldUtilizationData.length > 0 ? (
+              fieldUtilizationData.map((field, idx) => (
+                <div key={idx} className="group">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="text-sm text-gray-800 font-bold group-hover:text-purple-600 transition-colors">
+                        {field.field}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-gray-900">
+                        {field.utilization}%
+                      </span>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-tighter">
+                        {field.actual} / {field.capacity} Bookings
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-50">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${field.utilization}%`,
+                        background:
+                          field.utilization >= 70
+                            ? "linear-gradient(90deg, #10b981, #34d399)"
+                            : field.utilization >= 50
+                              ? "linear-gradient(90deg, #3b82f6, #60a5fa)"
+                              : "linear-gradient(90deg, #f97316, #fb923c)",
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${field.utilization}%`,
-                      background:
-                        field.utilization >= 70
-                          ? "linear-gradient(to right, #10b981, #059669)"
-                          : field.utilization >= 50
-                            ? "linear-gradient(to right, #3b82f6, #2563eb)"
-                            : "linear-gradient(to right, #f97316, #ea580c)",
-                    }}
-                  />
-                </div>
+              ))
+            ) : (
+              /* Skeleton Loading or Empty State */
+              <div className="py-10 text-center text-gray-400 text-sm italic">
+                Waiting for field data...
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -913,15 +962,15 @@ export function AnalyticsContent({
         ];
 
   const fieldUtilizationChart =
-    revenueByField.length > 0
-      ? revenueByField.map((item) => ({
+    fieldUtilization.length > 0
+      ? fieldUtilization.map((item) => ({
           field: item.field_name,
           utilization: Math.min(
-            Math.round((item.total_bookings / 200) * 100),
+            Math.round((item.utilization_rate / 100) * 100),
             100,
           ),
-          capacity: 200,
-          actual: item.total_bookings,
+          capacity: item.total_possible_bookings,
+          actual: item.actual_bookings,
         }))
       : [
           { field: "Field A", utilization: 78, capacity: 200, actual: 156 },

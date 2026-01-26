@@ -117,6 +117,28 @@ export interface BookingVolumeData {
   cancelled_bookings: number;
 }
 
+export interface TimeSlotHeatMapItem {
+  day_of_week: number;
+  day_name: string;
+  start_time: string;
+  end_time: string;
+  booking_count: number;
+  total_revenue: number;
+  utilization_rate: number;
+}
+
+export interface FieldUtilizationItem {
+  field_id: string;
+  field_name: string;
+  slots_per_day: number;
+  days_in_range: number;
+  total_possible_bookings: number;
+  actual_bookings: number;
+  utilization_rate: number;
+  total_revenue: number;
+  avg_revenue_per_booking: number;
+}
+
 // API Functions
 
 /**
