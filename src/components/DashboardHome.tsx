@@ -173,6 +173,7 @@ export function DashboardHome() {
         bookingVolumeTrends: bookingVolume,
         timeSlotHeatMap: timeSlotHeatMap,
         fieldUtilization: fieldUtilization,
+        userVsGuest: userVsGuest,
       }));
     } catch (err: any) {
       console.error("Full Data Sync Error:", err);
