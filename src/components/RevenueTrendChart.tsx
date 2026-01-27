@@ -24,27 +24,53 @@ export function RevenueTrendChart({
   loading,
 }: Props) {
   const chartData = useMemo(() => {
-    const dataMap = new Map<string, number>();
+    if (!data || data.length === 0) return [];
+
+    const isSingleDay = startDate === endDate;
+
+    // SINGLE DAY HOURLY VIEW
+    if (isSingleDay) {
+      return data
+        .filter((item) => item.slot_start_time !== null)
+        .sort((a, b) =>
+          String(a.slot_start_time).localeCompare(String(b.slot_start_time)),
+        )
+        .map((item) => ({
+          displayLabel: String(item.slot_start_time || "").slice(0, 5),
+          fullDate: `${String(item.slot_start_time || "").slice(0, 5)} - ${String(item.slot_end_time || "").slice(0, 5)}`,
+          amount: Number(item.total_revenue || 0),
+        }));
+    }
+
+    // MULTI-DAY TREND VIEW
+    const dataMap = new Map<string, { amount: number; label: string }>();
     data.forEach((item) => {
-      const current = dataMap.get(item.period_date) || 0;
-      dataMap.set(item.period_date, current + Number(item.total_revenue));
+      const dateKey = item.period_date;
+      if (!dateKey) return;
+      const existing = dataMap.get(dateKey);
+      const amount = Number(item.total_revenue || 0);
+      dataMap.set(dateKey, {
+        amount: (existing?.amount || 0) + amount,
+        label: item.period_label || dateKey,
+      });
     });
 
     const fullRange = [];
     let curr = new Date(startDate);
     const last = new Date(endDate);
+    const isMonthly =
+      (last.getTime() - curr.getTime()) / (1000 * 3600 * 24) > 31;
 
     while (curr <= last) {
       const dateStr = curr.toISOString().split("T")[0];
+      const entry = dataMap.get(dateStr);
       fullRange.push({
         fullDate: dateStr,
-        label: curr.toLocaleDateString("en-US", {
-          month: "short",
-          day: "2-digit",
-        }),
-        amount: dataMap.get(dateStr) || 0,
+        label: entry?.label || dateStr,
+        amount: entry?.amount || 0,
       });
-      curr.setDate(curr.getDate() + 1);
+      if (isMonthly) curr.setMonth(curr.getMonth() + 1);
+      else curr.setDate(curr.getDate() + 1);
     }
     return fullRange;
   }, [data, startDate, endDate]);
@@ -75,7 +101,7 @@ export function RevenueTrendChart({
               stroke="#f3f4f6"
             />
             <XAxis
-              dataKey="label"
+              dataKey={startDate === endDate ? "displayLabel" : "label"}
               fontSize={10}
               tickLine={false}
               axisLine={false}
@@ -105,6 +131,7 @@ export function RevenueTrendChart({
               stroke="#8b5cf6"
               strokeWidth={3}
               fill="url(#colorRev)"
+              animationDuration={1000}
             />
           </AreaChart>
         </ResponsiveContainer>
