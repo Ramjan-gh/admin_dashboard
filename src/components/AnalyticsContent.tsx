@@ -781,13 +781,6 @@ export function AnalyticsContent({
                                   <span className="text-sm font-bold">
                                     {value}
                                   </span>
-                                  {entry?.utilization && (
-                                    <span
-                                      className={`text-[9px] ${intensity > 0.4 ? "text-purple-100" : "text-gray-400"}`}
-                                    >
-                                      {entry.utilization}%
-                                    </span>
-                                  )}
                                 </div>
                               </td>
                             );
