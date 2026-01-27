@@ -45,6 +45,7 @@ export function DashboardHome() {
     bookingVolumeTrends: [],
     timeSlotHeatMap: [],
     fieldUtilization: [],
+    userVsGuest: [],
     customerSegments: [],
     customerRetention: [],
     bookingFrequency: [],
@@ -91,6 +92,7 @@ export function DashboardHome() {
         bookingVolume,
         timeSlotHeatMap,
         fieldUtilization,
+        userVsGuest,
       ] = await Promise.all([
         fetch(
           `${baseUrl}/get_revenue_trend?start_date=${startDate}&end_date=${endDate}`,
@@ -149,10 +151,14 @@ export function DashboardHome() {
           `${baseUrl}/get_field_utilization_rates?start_date=${startDate}&end_date=${endDate}`,
           { headers },
         ).then((res) => (res.ok ? res.json() : [])),
+        fetch(
+          `${baseUrl}/get_user_vs_guest_booking_trends?start_date=${startDate}&end_date=${endDate}`,
+          { headers },
+        ).then((res) => (res.ok ? res.json() : [])),
       ]);
 
       // Debugging Log
-      console.log("revenue trend:", trendRes);
+      console.log("user vs guest:", userVsGuest);
 
 
       // Update States
@@ -281,6 +287,7 @@ export function DashboardHome() {
                   bookingVolumeTrends={analyticsData.bookingVolumeTrends}
                   timeSlotHeatMap={analyticsData.timeSlotHeatMap}
                   fieldUtilization={analyticsData.fieldUtilization}
+                  userVsGuest={analyticsData.userVsGuest}
                   customerSegments={analyticsData.customerSegments}
                   customerRetention={analyticsData.customerRetention}
                   bookingFrequency={analyticsData.bookingFrequency}

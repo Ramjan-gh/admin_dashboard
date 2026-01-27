@@ -29,8 +29,10 @@ import {
   type BookingVolumeData,
   type TimeSlotHeatMapItem,
   type FieldUtilizationItem,
+  type UserVsGuestItem,
 } from "../../src/components/utils/analytics-api";
 import { b } from "framer-motion/dist/types.d-a9pt5qxk";
+import { UserVsGuestPieChart } from "./UserVsGuestPieChart";
 
 interface AnalyticsContentProps {
   tab: "revenue" | "bookings" | "customers" | "operations";
@@ -42,6 +44,7 @@ interface AnalyticsContentProps {
   bookingVolumeTrends: BookingVolumeData[];
   timeSlotHeatMap: TimeSlotHeatMapItem[];
   fieldUtilization: FieldUtilizationItem[];
+  userVsGuest: UserVsGuestItem[];
   customerSegments: RevenueByFieldItem[];
   customerRetention: RevenueByFieldItem[];
   bookingFrequency: RevenueByFieldItem[];
@@ -61,6 +64,7 @@ export function AnalyticsContent({
   bookingVolumeTrends,
   timeSlotHeatMap,
   fieldUtilization,
+  userVsGuest,
   customerSegments,
   customerRetention,
   bookingFrequency,
@@ -880,6 +884,17 @@ export function AnalyticsContent({
       { segment: "Returning", count: 200, percentage: 59, revenue: 89500 },
     ];
 
+    const userVsGuestData =
+      userVsGuest.length > 0
+        ? userVsGuest.map((item) => ({
+            booking_date: item.booking_date,
+            registered_user_bookings: item.registered_user_bookings,
+            guest_bookings: item.guest_bookings,
+          }))
+        : [
+            /* Your fallback mock data stays here */
+          ];
+
     const bookingFrequencyData = [
       { frequency: "1 time", customers: 85, color: "#3b82f6" },
       { frequency: "2-5 times", customers: 142, color: "#8b5cf6" },
@@ -936,6 +951,11 @@ export function AnalyticsContent({
                 </div>
               ))}
             </div>
+          </div>
+          {/* user vs guest customers */}
+          <div>
+            <h4 className="text-gray-900 mb-4">User vs Guest Customers</h4>
+            <UserVsGuestPieChart userVsGuestData={userVsGuestData} />
           </div>
         </div>
       </div>

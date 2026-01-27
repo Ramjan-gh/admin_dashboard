@@ -139,6 +139,12 @@ export interface FieldUtilizationItem {
   avg_revenue_per_booking: number;
 }
 
+export interface UserVsGuestItem {
+  booking_date: string;
+  registered_user_bookings: number;
+  guest_bookings: number;
+}
+
 // API Functions
 
 /**
