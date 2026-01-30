@@ -171,6 +171,7 @@ export interface TableProps {
   bookings: Booking[];
   loading: boolean;
   onView: (b: Booking) => void;
+  onEdit: (b: Booking) => void;
 }
 
 // BannerSettings.tsx types 

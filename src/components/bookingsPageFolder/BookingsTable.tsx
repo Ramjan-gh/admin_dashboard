@@ -1,4 +1,4 @@
-import { Eye } from "lucide-react";
+import { Eye, Edit2 } from "lucide-react";
 // Types 
 import { TableProps } from "../types";
 
@@ -17,7 +17,7 @@ export const getStatusColor = (status: string) => {
 
 
 
-export function BookingsTable({ bookings, loading, onView }: TableProps) {
+export function BookingsTable({ bookings, loading, onView, onEdit }: TableProps) {
   return (
     <div className="bg-white rounded-xl border shadow-sm overflow-hidden overflow-x-auto">
       <table className="w-full">
@@ -65,7 +65,7 @@ export function BookingsTable({ bookings, loading, onView }: TableProps) {
                 <td className="px-6 py-4">
                   <span
                     className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full tracking-wide shadow-sm ${getStatusColor(
-                      b.status
+                      b.status,
                     )}`}
                   >
                     {b.status.replace("_", " ")}
@@ -77,6 +77,12 @@ export function BookingsTable({ bookings, loading, onView }: TableProps) {
                     className="p-2 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
                   >
                     <Eye className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onEdit(b)}
+                    className="p-2 bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white rounded-lg transition-all"
+                  >
+                    <Edit2 className="w-4 h-4" />
                   </button>
                 </td>
               </tr>

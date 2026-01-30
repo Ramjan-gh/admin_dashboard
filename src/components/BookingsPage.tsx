@@ -4,10 +4,11 @@ import { Booking, BookingDetails, ApiItem } from "./types";
 import { BookingFilters } from "./bookingsPageFolder/BookingFilters";
 import { BookingsTable } from "./bookingsPageFolder/BookingsTable";
 import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer";
-
+import { UpdateBookingModal } from "./bookingsPageFolder/UpdateBookingModal";
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 export function BookingsPage() {
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,6 +105,24 @@ export function BookingsPage() {
     }
   };
 
+  const updateBooking = async (payload: any) => {
+    try {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_booking`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err) {
+      console.error("Update error:", err);
+      return { success: false, message: "Failed to update" };
+    }
+  };
+
   return (
     <div className="p-4 lg:p-6">
       <div className="flex justify-between items-center mb-6">
@@ -139,7 +158,18 @@ export function BookingsPage() {
             setSelectedBooking(b);
             fetchBookingDetails(b.bookingCode);
           }}
+          onEdit={(b) => setEditingBooking(b)} // New handler
         />
+
+        {/* Update Modal */}
+        {editingBooking && (
+          <UpdateBookingModal
+            booking={editingBooking}
+            onClose={() => setEditingBooking(null)}
+            onRefresh={fetchBookings}
+            updateBooking={updateBooking}
+          />
+        )}
 
         {/* Pagination */}
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
