@@ -24,8 +24,15 @@ const calculateWeeksBetween = (start: string, end: string): number => {
 
 export function DashboardHome() {
   // 1. Core State
-  const [startDate, setStartDate] = useState("2026-01-01");
-  const [endDate, setEndDate] = useState("2026-01-25");
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - 1);
+    return date.toISOString().split("T")[0];
+  });
+
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split("T")[0];
+  });
   const [fieldId, setFieldId] = useState<string>("");
   const [fieldsList, setFieldsList] = useState<any[]>([]);
 

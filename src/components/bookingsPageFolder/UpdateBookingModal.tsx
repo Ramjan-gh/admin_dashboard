@@ -180,6 +180,16 @@ export function UpdateBookingModal({
     }
   }, [formData.p_is_cancelled]);
 
+  useEffect(() => {
+    if (formData.p_payment_status === "fully_paid") {
+      const totalAmount = booking.booking?.final_amount ?? booking.amount ?? 0;
+      setFormData((prev) => ({
+        ...prev,
+        p_paid_amount: totalAmount,
+      }));
+    }
+  }, [formData.p_payment_status]);
+
   const toggleSlot = (slotId: string) => {
     setFormData((prev) => ({
       ...prev,
