@@ -60,6 +60,7 @@ export type BookingDetails = {
     discount_amount: number;
     discount_code: string;
     number_of_players: number;
+    is_cancelled: boolean;
   };
   discount_code: string;
 };

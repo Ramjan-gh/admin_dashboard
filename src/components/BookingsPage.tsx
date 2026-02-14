@@ -8,12 +8,15 @@ import { UpdateBookingModal } from "./bookingsPageFolder/UpdateBookingModal";
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 export function BookingsPage() {
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [editingBooking, setEditingBooking] = useState<BookingDetails | null>(
+    null,
+  );
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState<BookingDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [editDetailsLoading, setEditDetailsLoading] = useState(false);
 
   const [search, setSearch] = useState("");
   const [bookingDate, setBookingDate] = useState("");
@@ -50,7 +53,6 @@ export function BookingsPage() {
 
       const data: ApiItem[] = await res.json();
 
-      // Removed .sort() from the mapping chain to keep original API order
       const mapped: Booking[] = data.map((item) => {
         const slots = item.result.slots || [];
         const slot = slots[0];
@@ -98,28 +100,94 @@ export function BookingsPage() {
       });
       const data = await res.json();
       setDetails(data);
+      return data;
     } catch (err) {
       console.error("Error fetching details:", err);
+      return null;
     } finally {
       setDetailsLoading(false);
     }
   };
 
-  const updateBooking = async (payload: any) => {
+  const handleEdit = async (booking: Booking) => {
+    console.log("🔧 handleEdit called");
+
+    // Close the view drawer
+    setSelectedBooking(null);
+    setDetails(null);
+
+    setEditDetailsLoading(true);
+
+    // Fetch details WITHOUT setting the details state
     try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_booking`, {
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_booking_details`, {
         method: "POST",
         headers: {
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ p_booking_code: booking.bookingCode }),
       });
-      return await res.json();
+      const fullDetails = await res.json();
+      console.log("📦 Full details:", fullDetails);
+
+      if (fullDetails) {
+        console.log("✅ Setting editing booking");
+        setEditingBooking(fullDetails);
+      }
+    } catch (err) {
+      console.error("Error fetching details for edit:", err);
+    }
+
+    setEditDetailsLoading(false);
+  };
+
+  const updateBooking = async (payload: any) => {
+    try {
+      const requestBody = {
+        p_booking_id: payload.p_booking_id,
+        p_full_name: payload.p_full_name,
+        p_phone_number: payload.p_phone_number,
+        p_email: payload.p_email,
+        p_field_id: payload.p_field_id,
+        p_booking_date: payload.p_booking_date,
+        p_slot_ids: payload.p_slot_ids,
+        p_number_of_players: payload.p_total_players,
+        p_special_notes: payload.p_notes,
+        p_payment_status: payload.p_payment_status,
+        p_paid_amount: Number(payload.p_paid_amount),
+        p_is_cancelled: Boolean(payload.p_is_cancelled),
+        p_discount_code_id: null,
+        p_payment_method: payload.p_payment_method || "cash",
+      };
+
+      console.log("Request payload:", JSON.stringify(requestBody, null, 2));
+
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_booking`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("Supabase error response:", errorText);
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log("Success response:", data);
+      return data;
     } catch (err) {
       console.error("Update error:", err);
-      return { success: false, message: "Failed to update" };
+      const error = err as Error;
+      return [{ success: false, message: error.message || "Failed to update" }];
     }
   };
 
@@ -158,10 +226,9 @@ export function BookingsPage() {
             setSelectedBooking(b);
             fetchBookingDetails(b.bookingCode);
           }}
-          onEdit={(b) => setEditingBooking(b)} // New handler
+          onEdit={handleEdit} // Make sure this is handleEdit, not (b) => setEditingBooking(b)
         />
 
-        {/* Update Modal */}
         {editingBooking && (
           <UpdateBookingModal
             booking={editingBooking}
@@ -171,7 +238,14 @@ export function BookingsPage() {
           />
         )}
 
-        {/* Pagination */}
+        {editDetailsLoading && (
+          <div className="fixed inset-0 bg-black/50 z-[109] flex items-center justify-center">
+            <div className="bg-white p-6 rounded-xl shadow-xl">
+              <p className="text-gray-700">Loading booking details...</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
           <p className="text-sm text-gray-500">
             Showing {bookings.length} results

@@ -6,7 +6,8 @@ import {
   CreditCard,
   Tag,
   FileText,
-  Info,
+  Ban,
+  AlertTriangle,
 } from "lucide-react";
 import { getStatusColor } from "../bookingsPageFolder/BookingsTable";
 // Types
@@ -19,6 +20,10 @@ export function BookingDetailsDrawer({
 }: DrawerProps) {
   // Guard clause to prevent rendering if no details are present while not loading
   if (!details && !loading) return null;
+
+  const isCancelled =
+    details?.booking?.is_cancelled ||
+    details?.booking?.payment_status === "cancelled";
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-[100]">
@@ -49,6 +54,12 @@ export function BookingDetailsDrawer({
                     <span className="bg-white/20 backdrop-blur-md text-white text-[10px] w-fit px-2 py-0.5 rounded uppercase">
                       Venue Details
                     </span>
+                    {isCancelled && (
+                      <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded uppercase">
+                        <Ban className="w-3 h-3" />
+                        CANCELLED
+                      </span>
+                    )}
                   </div>
                   <h2 className="text-white text-2xl font-bold">
                     {details?.field?.field_name ?? "Unknown Venue"}
@@ -57,13 +68,30 @@ export function BookingDetailsDrawer({
               </div>
 
               <div className="p-6 space-y-8 pb-32">
+                {/* Cancellation Warning Banner */}
+                {isCancelled && (
+                  <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-red-900 text-sm">
+                        This Booking Has Been Cancelled
+                      </p>
+                      <p className="text-red-700 text-xs mt-1">
+                        This booking is no longer active. No charges apply.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Status & Code */}
                 <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300">
                   <div>
                     <p className="text-[10px] uppercase font-black text-gray-400">
                       Booking Code
                     </p>
-                    <p className="text-xl font-mono font-black text-purple-700">
+                    <p
+                      className={`text-xl font-mono font-black ${isCancelled ? "text-gray-400 line-through" : "text-purple-700"}`}
+                    >
                       {details?.booking?.booking_code ?? "N/A"}
                     </p>
                   </div>
@@ -90,7 +118,9 @@ export function BookingDetailsDrawer({
                       <p className="text-gray-400 text-[10px] uppercase">
                         Name
                       </p>
-                      <p className="font-bold text-gray-900">
+                      <p
+                        className={`font-bold ${isCancelled ? "text-gray-400" : "text-gray-900"}`}
+                      >
                         {details?.booking?.full_name ?? "Guest"}
                       </p>
                     </div>
@@ -98,7 +128,9 @@ export function BookingDetailsDrawer({
                       <p className="text-gray-400 text-[10px] uppercase">
                         Phone
                       </p>
-                      <p className="font-bold text-gray-900">
+                      <p
+                        className={`font-bold ${isCancelled ? "text-gray-400" : "text-gray-900"}`}
+                      >
                         {details?.booking?.phone_number ?? "N/A"}
                       </p>
                     </div>
@@ -106,19 +138,25 @@ export function BookingDetailsDrawer({
                       <p className="text-gray-400 text-[10px] uppercase">
                         Email Address
                       </p>
-                      <p className="font-bold text-gray-900">
+                      <p
+                        className={`font-bold ${isCancelled ? "text-gray-400" : "text-gray-900"}`}
+                      >
                         {details?.booking?.email ?? "N/A"}
                       </p>
                     </div>
                     <div className="col-span-2 bg-gray-50 p-3 rounded-lg flex items-center gap-3">
-                      <div className="p-2 bg-purple-100 rounded text-purple-600">
+                      <div
+                        className={`p-2 rounded ${isCancelled ? "bg-gray-200 text-gray-400" : "bg-purple-100 text-purple-600"}`}
+                      >
                         <Users className="w-4 h-4" />
                       </div>
                       <div>
                         <p className="text-gray-400 text-[10px] uppercase">
                           Total Players
                         </p>
-                        <p className="font-bold text-gray-900">
+                        <p
+                          className={`font-bold ${isCancelled ? "text-gray-400" : "text-gray-900"}`}
+                        >
                           {details?.booking?.number_of_players ?? 0} Expected
                         </p>
                       </div>
@@ -139,14 +177,26 @@ export function BookingDetailsDrawer({
                       details.slots.map((s, idx) => (
                         <div
                           key={idx}
-                          className="bg-blue-50/50 border border-blue-100 p-4 rounded-xl flex justify-between items-center"
+                          className={`border p-4 rounded-xl flex justify-between items-center ${
+                            isCancelled
+                              ? "bg-gray-50 border-gray-200"
+                              : "bg-blue-50/50 border-blue-100"
+                          }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="text-purple-600">
+                            <div
+                              className={
+                                isCancelled
+                                  ? "text-gray-400"
+                                  : "text-purple-600"
+                              }
+                            >
                               <Calendar className="w-4 h-4" />
                             </div>
                             <div>
-                              <p className="font-bold text-gray-900">
+                              <p
+                                className={`font-bold ${isCancelled ? "text-gray-400" : "text-gray-900"}`}
+                              >
                                 {s?.booking_date
                                   ? new Date(s.booking_date).toLocaleDateString(
                                       "en-GB",
@@ -158,14 +208,18 @@ export function BookingDetailsDrawer({
                                     )
                                   : "N/A"}
                               </p>
-                              <p className="text-blue-600 text-xs font-semibold">
+                              <p
+                                className={`text-xs font-semibold ${isCancelled ? "text-gray-400" : "text-blue-600"}`}
+                              >
                                 {s?.start_time?.slice(0, 5) ?? "00:00"} -{" "}
                                 {s?.end_time?.slice(0, 5) ?? "00:00"} (
                                 {s?.duration_minutes ?? 0} mins)
                               </p>
                             </div>
                           </div>
-                          <p className="font-black text-gray-900">
+                          <p
+                            className={`font-black ${isCancelled ? "text-gray-400 line-through" : "text-gray-900"}`}
+                          >
                             ৳{s?.slot_price ?? 0}
                           </p>
                         </div>
@@ -189,7 +243,9 @@ export function BookingDetailsDrawer({
                   <div className="bg-white border rounded-xl divide-y">
                     <div className="p-4 flex justify-between text-sm">
                       <span className="text-gray-500">Subtotal Amount</span>
-                      <span className="font-semibold text-gray-900">
+                      <span
+                        className={`font-semibold ${isCancelled ? "text-gray-400 line-through" : "text-gray-900"}`}
+                      >
                         ৳{details?.booking?.total_amount ?? 0}
                       </span>
                     </div>
@@ -201,7 +257,9 @@ export function BookingDetailsDrawer({
                             Discount ({details?.discount_code ?? "NONE"})
                           </span>
                         </div>
-                        <span className="font-bold text-red-600">
+                        <span
+                          className={`font-bold text-red-600 ${isCancelled ? "line-through" : ""}`}
+                        >
                           - ৳{details?.booking?.discount_amount}
                         </span>
                       </div>
@@ -214,10 +272,46 @@ export function BookingDetailsDrawer({
                         {details?.booking?.payment_method ?? "N/A"}
                       </span>
                     </div>
-                    <div className="p-4 flex justify-between text-base bg-gray-50 font-black">
+                    <div
+                      className={`p-4 flex justify-between text-base font-black ${isCancelled ? "bg-gray-50" : "bg-gray-50"}`}
+                    >
                       <span className="text-gray-900">Final Total</span>
-                      <span className="text-purple-700">
+                      <span
+                        className={
+                          isCancelled
+                            ? "text-gray-400 line-through"
+                            : "text-purple-700"
+                        }
+                      >
                         ৳{details?.booking?.final_amount ?? 0}
+                      </span>
+                    </div>
+
+                    {/* ADD THIS SECTION - Paid Amount */}
+                    <div className="p-4 flex justify-between text-sm bg-green-50">
+                      <span className="text-gray-700 font-medium uppercase text-[10px]">
+                        Amount Paid
+                      </span>
+                      <span
+                        className={`font-bold ${isCancelled ? "text-gray-400" : "text-green-700"}`}
+                      >
+                        ৳{details?.booking?.paid_amount ?? 0}
+                      </span>
+                    </div>
+
+                    {/* Balance Due */}
+                    <div
+                      className={`p-4 flex justify-between text-base font-black ${isCancelled ? "bg-gray-100" : "bg-red-50"}`}
+                    >
+                      <span className="text-gray-900">Balance Due</span>
+                      <span
+                        className={
+                          isCancelled ? "text-gray-400" : "text-red-700"
+                        }
+                      >
+                        ৳
+                        {(details?.booking?.final_amount ?? 0) -
+                          (details?.booking?.paid_amount ?? 0)}
                       </span>
                     </div>
                   </div>
@@ -264,16 +358,18 @@ export function BookingDetailsDrawer({
 
               {/* Sticky Action Footer */}
               <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-6 border-t mt-auto">
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-xs text-gray-500 font-bold uppercase">
-                    Balance Remaining
-                  </p>
-                  <p className="text-xl font-black text-red-600">
-                    ৳{" "}
-                    {(details?.booking?.final_amount ?? 0) -
-                      (details?.booking?.paid_amount ?? 0)}
-                  </p>
-                </div>
+                {!isCancelled && (
+                  <div className="flex justify-between items-center mb-4">
+                    <p className="text-xs text-gray-500 font-bold uppercase">
+                      Balance Remaining
+                    </p>
+                    <p className="text-xl font-black text-red-600">
+                      ৳{" "}
+                      {(details?.booking?.final_amount ?? 0) -
+                        (details?.booking?.paid_amount ?? 0)}
+                    </p>
+                  </div>
+                )}
                 <button
                   onClick={onClose}
                   className="w-full py-4 bg-black text-white font-black uppercase rounded-2xl shadow-lg transition-all active:scale-95"

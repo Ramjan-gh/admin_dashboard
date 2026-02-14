@@ -11,33 +11,31 @@ export function UpdateBookingModal({
   const [fields, setFields] = useState<any[]>([]);
   const [availableSlots, setAvailableSlots] = useState<any[]>([]);
 
-  // Initialize form data by mapping the nested objects from the Drawer's data structure
+  // Initialize form data WITHOUT field_id (we'll set it after fields load)
   const [formData, setFormData] = useState({
-    p_booking_id: booking.id || "",
-    p_full_name: booking.customer || "",
-    p_phone_number: booking.phone || "",
-    p_email: booking.email || "", // Note: your log shows this as undefined
-    p_payment_status: booking.status || "unpaid",
-    p_paid_amount: booking.amount || 0,
-    p_is_cancelled: booking.status === "cancelled",
+    p_booking_id: booking.booking?.id ?? booking.id ?? "",
+    p_full_name: booking.booking?.full_name ?? booking.customer ?? "",
+    p_phone_number: booking.booking?.phone_number ?? booking.phone ?? "",
+    p_email: booking.booking?.email ?? booking.email ?? "",
+    p_payment_status:
+      booking.booking?.payment_status ?? booking.status ?? "",
+    p_paid_amount: booking.booking?.paid_amount ?? booking.amount ?? 0,
+    p_payment_method:
+      booking.booking?.payment_method ?? booking.payment ?? "cash",
+    p_is_cancelled: booking.booking?.is_cancelled ?? false,
+    p_total_players: booking.booking?.number_of_players ?? 0,
+    p_notes: booking.booking?.special_notes ?? "",
 
-    // We leave this empty initially; the useEffect above will fix it
-    p_field_id: "",
-
-    // Use dateISO as it's already in the required YYYY-MM-DD format
-    p_booking_date: booking.dateISO || "",
-
-    // If slot_ids aren't in the object, you might need to fetch them
-    // or handle them via the slot selection UI
-    p_slot_ids: booking.slot_ids || [],
+    p_field_id: "", // Will be set after fields load
+    p_booking_date: booking.slots?.[0]?.booking_date ?? "",
+    p_slot_ids: booking.slots?.map((s: any) => s.slot_id).filter(Boolean) ?? [],
   });
 
-  console.log("Current Field ID in State:", formData.p_field_id);
-  console.log(
-    "Available Fields:",
-    fields.map((f) => f.id),
-  );
-console.log("Current Booking Data:", booking);
+  console.log("=== BOOKING DATA ===");
+  console.log("Full booking:", booking);
+  console.log("Field name:", booking.field?.field_name);
+  console.log("===================");
+
   const supabaseHeaders = {
     apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
     Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
@@ -51,13 +49,13 @@ console.log("Current Booking Data:", booking);
         const res = await fetch(
           "https://himsgwtkvewhxvmjapqa.supabase.co/rest/v1/rpc/get_fields",
           {
-            method: "POST", // RPCs generally use POST [cite: 127]
+            method: "POST",
             headers: supabaseHeaders,
           },
         );
         const data = await res.json();
-        // Ensure data is an array to prevent .map() errors
         setFields(Array.isArray(data) ? data : []);
+        console.log("🏟️ Fields loaded:", data);
       } catch (error) {
         console.error("Error fetching fields:", error);
         setFields([]);
@@ -66,12 +64,72 @@ console.log("Current Booking Data:", booking);
     fetchFields();
   }, []);
 
-  // 2. Fetch available slots whenever field or date changes
+  // 2. Auto-select field when fields are loaded
+  useEffect(() => {
+    if (
+      fields.length > 0 &&
+      booking.field?.field_name &&
+      !formData.p_field_id
+    ) {
+      console.log("🔍 Looking for field:", booking.field.field_name);
+      console.log(
+        "📋 Available field names:",
+        fields.map((f) => f.name),
+      ); // Changed from f.field_name
+
+      // Match by 'name' property instead of 'field_name'
+      const matchingField = fields.find(
+        (f) => f.name === booking.field.field_name,
+      );
+
+      if (matchingField) {
+        console.log(
+          "✅ Found matching field:",
+          matchingField.name,
+          "ID:",
+          matchingField.id,
+        );
+        setFormData((prev) => ({
+          ...prev,
+          p_field_id: matchingField.id,
+        }));
+      } else {
+        console.warn("⚠️ No exact match found, trying case-insensitive...");
+
+        // Try case-insensitive match
+        const matchingFieldCaseInsensitive = fields.find(
+          (f) =>
+            f.name?.toLowerCase() === booking.field.field_name?.toLowerCase(),
+        );
+
+        if (matchingFieldCaseInsensitive) {
+          console.log(
+            "✅ Found with case-insensitive match:",
+            matchingFieldCaseInsensitive.name,
+          );
+          setFormData((prev) => ({
+            ...prev,
+            p_field_id: matchingFieldCaseInsensitive.id,
+          }));
+        } else {
+          console.error("❌ Could not find matching field");
+        }
+      }
+    }
+  }, [fields, booking.field?.field_name]);
+
+  // 3. Fetch available slots whenever field or date changes
   useEffect(() => {
     if (formData.p_field_id && formData.p_booking_date) {
+      console.log(
+        "🔄 Fetching slots for field:",
+        formData.p_field_id,
+        "date:",
+        formData.p_booking_date,
+      );
+
       const fetchSlots = async () => {
         try {
-          // FIX: Use GET method and pass parameters via URL query string
           const params = new URLSearchParams({
             p_field_id: formData.p_field_id,
             p_booking_date: formData.p_booking_date,
@@ -80,11 +138,10 @@ console.log("Current Booking Data:", booking);
           const res = await fetch(
             `https://himsgwtkvewhxvmjapqa.supabase.co/rest/v1/rpc/get_slots?${params.toString()}`,
             {
-              method: "GET", // Changed from POST to GET
+              method: "GET",
               headers: {
                 apikey: supabaseHeaders.apikey,
                 Authorization: supabaseHeaders.Authorization,
-                // Content-Type is not needed for GET requests without a body
               },
             },
           );
@@ -101,6 +158,7 @@ console.log("Current Booking Data:", booking);
               })),
             );
             setAvailableSlots(flattenedSlots);
+            console.log("⏰ Slots loaded:", flattenedSlots.length);
           } else {
             setAvailableSlots([]);
           }
@@ -112,6 +170,15 @@ console.log("Current Booking Data:", booking);
       fetchSlots();
     }
   }, [formData.p_field_id, formData.p_booking_date]);
+
+  useEffect(() => {
+    if (formData.p_is_cancelled) {
+      setFormData((prev) => ({
+        ...prev,
+        p_payment_status: "cancelled",
+      }));
+    }
+  }, [formData.p_is_cancelled]);
 
   const toggleSlot = (slotId: string) => {
     setFormData((prev) => ({
@@ -125,54 +192,62 @@ console.log("Current Booking Data:", booking);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // The documentation notes that past dates are rejected
+    if (formData.p_slot_ids.length === 0) {
+      alert("Please select at least one time slot");
+      return;
+    }
+
+    // Only validate that the NEW booking date/time is not in the past
     const selectedDate = new Date(formData.p_booking_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
 
+    // Check if the selected date is before today
     if (selectedDate < today) {
       alert("Error: You cannot reschedule a booking to a past date.");
       return;
     }
 
+    // If the date is today, check if the slot time has passed
+    if (
+      selectedDate.getTime() === today.getTime() &&
+      formData.p_slot_ids.length > 0
+    ) {
+      // Get the earliest slot time from selected slots
+      const earliestSlot = availableSlots
+        .filter((slot) => formData.p_slot_ids.includes(slot.id))
+        .sort((a, b) => a.start_time.localeCompare(b.start_time))[0];
+
+      if (earliestSlot) {
+        const [hours, minutes] = earliestSlot.start_time.split(":");
+        const slotDateTime = new Date();
+        slotDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+        const now = new Date();
+
+        if (slotDateTime < now) {
+          alert("Error: The selected time slot has already passed.");
+          return;
+        }
+      }
+    }
+
     setLoading(true);
 
-    // Note: The API returns an array containing the result object
     const result = await updateBooking(formData);
-
-    // Accessing the first element of the returned array as shown in your console log
     const response = Array.isArray(result) ? result[0] : result;
 
     if (response?.success) {
-      alert(response.message || "Booking updated successfully"); // cite: 144
+      alert(response.message || "Booking updated successfully");
       onRefresh();
       onClose();
     } else {
-      // This will now show "Cannot update to a date in the past" in the alert
       alert(response?.message || "Failed to update booking");
     }
+
     setLoading(false);
   };
-
-  useEffect(() => {
-    // Check if we have fields and a 'sport' name from the booking data
-    if (fields.length > 0 && booking?.sport && !formData.p_field_id) {
-      // Find the field object where the name matches the 'sport' property
-      const matchingField = fields.find(
-        (f) => (f.field_name || f.name) === booking.sport,
-      );
-
-      if (matchingField) {
-        console.log("Match found! Setting field ID to:", matchingField.id);
-        setFormData((prev) => ({
-          ...prev,
-          p_field_id: matchingField.id,
-        }));
-      } else {
-        console.warn("No field found matching the name:", booking.sport);
-      }
-    }
-  }, [fields, booking, formData.p_field_id]);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
@@ -184,7 +259,7 @@ console.log("Current Booking Data:", booking);
               Reschedule & Update
             </h2>
             <p className="text-xs text-gray-500 mt-1">
-              Booking ID: {booking.id}
+              Booking Code: {booking.booking?.booking_code}
             </p>
           </div>
           <button
@@ -217,7 +292,7 @@ console.log("Current Booking Data:", booking);
                   <option value="">Choose a Field</option>
                   {fields.map((f: any) => (
                     <option key={f.id} value={f.id}>
-                      {f.field_name || f.name}
+                      {f.name} {/* Changed from f.field_name || f.name */}
                     </option>
                   ))}
                 </select>
@@ -250,13 +325,12 @@ console.log("Current Booking Data:", booking);
                       key={slot.id}
                       type="button"
                       onClick={() => toggleSlot(slot.id)}
-                      // ONLY disable if it's booked by someone else (not in our current p_slot_ids)
                       disabled={
                         slot.is_booked && !formData.p_slot_ids.includes(slot.id)
                       }
                       className={`p-2 text-[10px] font-bold rounded-lg border transition-all ${
                         formData.p_slot_ids.includes(slot.id)
-                          ? "bg-purple-600 border-purple-600 text-white shadow-sm" // Selected/Current slots
+                          ? "bg-purple-600 border-purple-600 text-white shadow-sm"
                           : "bg-white border-gray-200 text-gray-700"
                       } ${
                         slot.is_booked && !formData.p_slot_ids.includes(slot.id)
@@ -289,6 +363,7 @@ console.log("Current Booking Data:", booking);
                   Full Name
                 </label>
                 <input
+                  required
                   className="w-full p-2 border rounded-lg mt-1 text-gray-900"
                   value={formData.p_full_name}
                   onChange={(e) =>
@@ -301,6 +376,7 @@ console.log("Current Booking Data:", booking);
                   Phone
                 </label>
                 <input
+                  required
                   className="w-full p-2 border rounded-lg mt-1 text-gray-900"
                   value={formData.p_phone_number}
                   onChange={(e) =>
@@ -313,12 +389,33 @@ console.log("Current Booking Data:", booking);
                   Email
                 </label>
                 <input
+                  type="email"
                   className="w-full p-2 border rounded-lg mt-1 text-gray-900"
                   value={formData.p_email}
                   onChange={(e) =>
                     setFormData({ ...formData, p_email: e.target.value })
                   }
                 />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-500 uppercase">
+                  Payment Method
+                </label>
+                <select
+                  className="w-full p-2 border rounded-lg mt-1 text-gray-900"
+                  value={formData.p_payment_method}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      p_payment_method: e.target.value,
+                    })
+                  }
+                >
+                  <option value="cash">Cash</option>
+                  <option value="bkash">Bkash</option>
+                  <option value="online">Online</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </select>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-gray-500 uppercase">
@@ -334,9 +431,8 @@ console.log("Current Booking Data:", booking);
                     })
                   }
                 >
-                  <option value="unpaid">Unpaid</option>
                   <option value="partially_paid">Partially Paid</option>
-                  <option value="paid">Paid</option>
+                  <option value="fully_paid">Paid</option>
                 </select>
               </div>
               <div>
@@ -345,6 +441,7 @@ console.log("Current Booking Data:", booking);
                 </label>
                 <input
                   type="number"
+                  step="0.01"
                   className="w-full p-2 border rounded-lg mt-1 text-gray-900"
                   value={formData.p_paid_amount}
                   onChange={(e) =>
@@ -352,6 +449,45 @@ console.log("Current Booking Data:", booking);
                       ...formData,
                       p_paid_amount: Number(e.target.value),
                     })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Players & Notes Section */}
+          <div className="space-y-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
+            <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
+              Additional Details
+            </h3>
+            <div className="grid grid-cols-4 gap-4">
+              <div className="col-span-1">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">
+                  Players
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full p-2 border rounded-lg mt-1 text-gray-900 bg-white"
+                  value={formData.p_total_players}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      p_total_players: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div className="col-span-3">
+                <label className="text-[10px] font-bold text-gray-500 uppercase">
+                  Special Notes
+                </label>
+                <input
+                  placeholder="e.g. Needs bibs, extra water..."
+                  className="w-full p-2 border rounded-lg mt-1 text-gray-900 bg-white"
+                  value={formData.p_notes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, p_notes: e.target.value })
                   }
                 />
               </div>
