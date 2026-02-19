@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { Toaster } from "sonner";
 import { Booking, BookingDetails, ApiItem } from "./types";
 import { BookingFilters } from "./bookingsPageFolder/BookingFilters";
 import { BookingsTable } from "./bookingsPageFolder/BookingsTable";
 import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer";
 import { UpdateBookingModal } from "./bookingsPageFolder/UpdateBookingModal";
+import { BookingPopup } from "./bookingsPageFolder/BookingPopup"; // ADD THIS
+import { toast } from "sonner";
+
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 export function BookingsPage() {
+  const [showBookingPopup, setShowBookingPopup] = useState(false);
   const [editingBooking, setEditingBooking] = useState<BookingDetails | null>(
     null,
   );
@@ -195,7 +200,10 @@ export function BookingsPage() {
     <div className="p-4 lg:p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-semibold">Bookings Management</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg transition-transform active:scale-95">
+        <button
+          onClick={() => setShowBookingPopup(true)} // CHANGE THIS
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg transition-transform active:scale-95"
+        >
           <Plus className="w-5 h-5" /> Add Booking
         </button>
       </div>
@@ -216,6 +224,15 @@ export function BookingsPage() {
             setFieldFilter("");
             setPaymentStatus("");
             setOffset(0);
+          }}
+        />
+
+        <BookingPopup
+          isOpen={showBookingPopup}
+          onClose={() => {
+            setShowBookingPopup(false);
+            toast.success("Booking created successfully!");
+            fetchBookings(); // Refresh bookings list
           }}
         />
 
