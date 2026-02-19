@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DropResult } from "@hello-pangea/dnd";
+import { toast } from "sonner";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
@@ -37,6 +38,7 @@ export function useTurfs() {
       }
     } catch (error) {
       console.error("Fetch error:", error);
+      toast.error("Failed to fetch fields");
     }
   };
 
@@ -78,8 +80,10 @@ export function useTurfs() {
     setTurfs(updatedItems);
     try {
       await syncOrderToDatabase(updatedItems);
+      toast.success("Field order updated!");
     } catch (err) {
       console.error("Failed to sync order", err);
+      toast.error("Failed to update field order");
     }
   };
 
@@ -87,7 +91,7 @@ export function useTurfs() {
     setUploading(type);
     const accessToken = localStorage.getItem("sb-access-token");
     if (!accessToken) {
-      alert("You must be logged in to upload images.");
+      toast.error("You must be logged in to upload images");
       setUploading(null);
       return;
     }
@@ -116,9 +120,13 @@ export function useTurfs() {
           ...prev,
           [type === "bg" ? "background_image_url" : "icon_url"]: publicUrl,
         }));
+        toast.success(`${type === "bg" ? "Background image" : "Icon"} uploaded successfully!`);
+      } else {
+        toast.error("Upload failed");
       }
     } catch (error) {
       console.error("Upload error:", error);
+      toast.error("Upload error occurred");
     } finally {
       setUploading(null);
     }
@@ -133,27 +141,38 @@ export function useTurfs() {
 
     // 2. Validate ID for Edit mode
     if (isEdit && !selectedTurf?.id) {
-      alert("Error: No ID found for the field you are trying to update.");
+      toast.error("No ID found for the field you are trying to update");
       return;
     }
 
     setLoading(true);
 
-    // 3. Construct the body exactly as the SQL RPC expects
-    const body: any = {
-      p_name: formData.name,
-      p_description: formData.description,
-      p_background_image_url: formData.background_image_url,
-      p_icon_url: formData.icon_url,
-      p_size: formData.size,
-      p_player_capacity: Number(formData.player_capacity),
-      p_is_active: formData.is_active,
-      p_display_order: formData.display_order,
-    };
-    
-    // Use the ID from selectedTurf if editing
+    // 3. Construct the body - DIFFERENT for add vs update
+    let body: any;
+
     if (isEdit) {
-      body.p_id = selectedTurf.id; 
+      // UPDATE: Include all fields including display_order and is_active
+      body = {
+        p_id: selectedTurf.id,
+        p_name: formData.name,
+        p_description: formData.description,
+        p_background_image_url: formData.background_image_url,
+        p_icon_url: formData.icon_url,
+        p_size: formData.size,
+        p_player_capacity: Number(formData.player_capacity),
+        p_is_active: formData.is_active,
+        p_display_order: formData.display_order,
+      };
+    } else {
+      // ADD: Only include fields that add_field accepts (no display_order, no is_active)
+      body = {
+        p_name: formData.name,
+        p_description: formData.description,
+        p_background_image_url: formData.background_image_url,
+        p_icon_url: formData.icon_url,
+        p_size: formData.size,
+        p_player_capacity: Number(formData.player_capacity),
+      };
     }
 
     try {
@@ -168,26 +187,36 @@ export function useTurfs() {
       });
 
       if (!res.ok) {
-        // Detailed error logging
         const errorData = await res.json();
-        console.error("Payload sent:", body); // See exactly what was sent
+        console.error("Payload sent:", body);
         console.error("Supabase Error:", errorData);
-        alert(`Error: ${errorData.message}`);
+        toast.error(errorData.message || "Failed to save field");
         return;
       }
 
+      const result = await res.json();
+      console.log("Success:", result);
+
+      // SUCCESS TOASTS
+      if (isEdit) {
+        toast.success("Field updated successfully!");
+      } else {
+        toast.success("Field created successfully!");
+      }
+
       setIsModalOpen(false);
-      setSelectedTurf(null); // Clear selection after success
-      fetchTurfs(); // Refresh the list
+      setSelectedTurf(null);
+      fetchTurfs();
     } catch (err) {
       console.error("Network error:", err);
+      toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure?")) return;
+    if (!window.confirm("Are you sure you want to delete this field?")) return;
     setLoading(true);
     try {
       const response = await fetch(`${BASE_URL}/rest/v1/rpc/delete_field`, {
@@ -205,7 +234,13 @@ export function useTurfs() {
           .map((t, i) => ({ ...t, display_order: i + 1 }));
         setTurfs(remaining);
         await syncOrderToDatabase(remaining);
+        toast.success("Field deleted successfully!");
+      } else {
+        toast.error("Failed to delete field");
       }
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("Network error during deletion");
     } finally {
       setLoading(false);
     }
@@ -241,7 +276,18 @@ export function useTurfs() {
   };
 
   return {
-    turfs, formData, setFormData, loading, uploading, isModalOpen, setIsModalOpen,
-    selectedTurf, onDragEnd, handleFileUpload, handleSubmit, handleDelete, openModal
+    turfs,
+    formData,
+    setFormData,
+    loading,
+    uploading,
+    isModalOpen,
+    setIsModalOpen,
+    selectedTurf,
+    onDragEnd,
+    handleFileUpload,
+    handleSubmit,
+    handleDelete,
+    openModal,
   };
 }

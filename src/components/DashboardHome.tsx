@@ -26,12 +26,12 @@ export function DashboardHome() {
   // 1. Core State
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
-    date.setMonth(date.getMonth() - 1);
+    date.setDate(date.getDate() - 10); // 10 days ago
     return date.toISOString().split("T")[0];
   });
 
   const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
+    return new Date().toISOString().split("T")[0]; // Today
   });
   const [fieldId, setFieldId] = useState<string>("");
   const [fieldsList, setFieldsList] = useState<any[]>([]);

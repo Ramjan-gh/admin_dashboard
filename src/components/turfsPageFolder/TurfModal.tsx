@@ -67,12 +67,16 @@ export function TurfModal({
               </label>
               <input
                 type="text"
+                placeholder="e.g. 12m*24m"
+                pattern="^\d+m\*\d+m$"
                 className="w-full mt-1 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.size}
                 onChange={(e) =>
                   setFormData({ ...formData, size: e.target.value })
                 }
+                title="Format: 12m*24m (numbers with m, separated by *)"
               />
+              <p className="text-xs text-gray-400 mt-1 ml-1">Format: 12m*24m</p>
             </div>
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase ml-1">
@@ -80,12 +84,17 @@ export function TurfModal({
               </label>
               <input
                 type="number"
+                min="0"
+                placeholder="Enter capacity"
                 className="w-full mt-1 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                value={formData.player_capacity}
+                value={
+                  formData.player_capacity === 0 ? "" : formData.player_capacity
+                }
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    player_capacity: parseInt(e.target.value) || 0,
+                    player_capacity:
+                      e.target.value === "" ? 0 : parseInt(e.target.value) || 0,
                   })
                 }
               />

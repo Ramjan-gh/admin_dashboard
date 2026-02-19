@@ -316,7 +316,6 @@ export function BookingDetailsDrawer({
                     </div>
                   </div>
                 </div>
-
                 {/* Special Notes */}
                 {details?.booking?.special_notes && (
                   <div className="space-y-2">
