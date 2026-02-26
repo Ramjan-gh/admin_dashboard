@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { TrendingUp, Loader2 } from "lucide-react";
 import {
   AreaChart,
@@ -23,6 +23,9 @@ export function RevenueTrendChart({
   endDate,
   loading,
 }: Props) {
+  // Force re-render key to trigger animation
+  const [animationKey, setAnimationKey] = useState(0);
+
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
@@ -42,7 +45,6 @@ export function RevenueTrendChart({
           String(a.slot_start_time).localeCompare(String(b.slot_start_time)),
         );
 
-      // Group by time slot and sum revenue
       const timeSlotMap = new Map<string, number>();
       hourlyData.forEach((item) => {
         const timeKey = String(item.slot_start_time).slice(0, 5);
@@ -65,7 +67,6 @@ export function RevenueTrendChart({
 
       data.forEach((item) => {
         if (!item.period_date) return;
-        // Extract year-month (e.g., "2026-01")
         const monthKey = item.period_date.substring(0, 7);
         const existing = monthlyMap.get(monthKey);
         const amount = Number(item.total_revenue || 0);
@@ -79,7 +80,6 @@ export function RevenueTrendChart({
       return Array.from(monthlyMap.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([key, value]) => {
-          // Format the month properly (e.g., "Jan 2026")
           const [year, month] = key.split("-");
           const date = new Date(parseInt(year), parseInt(month) - 1, 1);
           const monthLabel = date.toLocaleDateString("en-GB", {
@@ -110,7 +110,6 @@ export function RevenueTrendChart({
       });
     });
 
-    // Fill in missing dates with 0 revenue
     const fullRange = [];
     let curr = new Date(startDate);
     const last = new Date(endDate);
@@ -135,6 +134,11 @@ export function RevenueTrendChart({
 
     return fullRange;
   }, [data, startDate, endDate]);
+
+  // Trigger animation on data change
+  useEffect(() => {
+    setAnimationKey((prev) => prev + 1);
+  }, [chartData]);
 
   const viewType = useMemo(() => {
     if (startDate === endDate) return "Hourly";
@@ -161,34 +165,41 @@ export function RevenueTrendChart({
       </div>
       <div className="h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData}>
+          <AreaChart data={chartData} key={animationKey}>
             <defs>
               <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15} />
                 <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
               </linearGradient>
             </defs>
+
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
               stroke="#f3f4f6"
             />
+
             <XAxis
               dataKey={startDate === endDate ? "displayLabel" : "label"}
-              fontSize={10}
+              fontSize={11}
               tickLine={false}
               axisLine={false}
-              minTickGap={30}
+              stroke="#9ca3af"
+              dy={10}
               angle={viewType === "Hourly" ? -45 : 0}
               textAnchor={viewType === "Hourly" ? "end" : "middle"}
               height={viewType === "Hourly" ? 60 : 30}
             />
+
             <YAxis
-              fontSize={10}
+              fontSize={11}
               tickLine={false}
               axisLine={false}
+              stroke="#9ca3af"
+              dx={-10}
               tickFormatter={(v) => `৳${v}`}
             />
+
             <Tooltip
               labelFormatter={(_, payload) => payload[0]?.payload?.fullDate}
               formatter={(val: number) => [
@@ -201,13 +212,15 @@ export function RevenueTrendChart({
                 boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
               }}
             />
+
             <Area
               type="monotone"
               dataKey="amount"
               stroke="#8b5cf6"
               strokeWidth={3}
+              fillOpacity={1}
               fill="url(#colorRev)"
-              animationDuration={1000}
+              name="Revenue"
             />
           </AreaChart>
         </ResponsiveContainer>

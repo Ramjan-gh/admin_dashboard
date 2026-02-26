@@ -209,24 +209,28 @@ export function DashboardHome() {
         </div>
 
         {/* Date Range Picker */}
-        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-400 ml-2" />
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="text-sm border-none focus:ring-0"
-          />
-          <ArrowRight className="w-4 h-4 text-gray-300" />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="text-sm border-none focus:ring-0"
-          />
+        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <Calendar className="w-4 h-4 text-gray-400 ml-2 hidden sm:block" />
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="text-sm border-none focus:ring-0 w-full sm:w-auto"
+            />
+            <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="text-sm border-none focus:ring-0 w-full sm:w-auto"
+            />
+          </div>
+
           <button
             onClick={fetchData}
-            className="p-2 hover:bg-purple-50 rounded-lg text-purple-600 transition-colors"
+            className="p-2 hover:bg-purple-50 rounded-lg text-purple-600 transition-colors self-center sm:self-auto"
           >
             <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
           </button>

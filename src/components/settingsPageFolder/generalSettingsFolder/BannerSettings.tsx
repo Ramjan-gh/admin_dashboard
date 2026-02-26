@@ -1,6 +1,5 @@
 import { Plus, Trash2, Loader2, Image as ImageIcon } from "lucide-react";
 
-// Types 
 import { Props } from "../../types";
 
 export function BannerSettings({

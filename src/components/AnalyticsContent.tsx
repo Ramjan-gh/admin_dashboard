@@ -16,8 +16,9 @@ import {
   Legend,
   AreaChart,
   Area,
+  
 } from "recharts";
-import { Zap, Clock, CreditCard, Target } from "lucide-react";
+import { Zap, Clock, CreditCard, Target, ChevronDown } from "lucide-react";
 import {
   type RevenueByFieldItem,
   type WeeklyRevenuePatternItem,
@@ -171,9 +172,9 @@ export function AnalyticsContent({
     return (
       <div className="space-y-24">
         {/* Revenue by Field */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <h4 className="text-gray-900 mb-4">Revenue by Field</h4>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 ">
+          <div className=" bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h4 className="text-gray-900 mb-4 ">Revenue by Field</h4>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={revenueByFieldChart}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -220,32 +221,37 @@ export function AnalyticsContent({
           </div>
 
           {/* Revenue by Time Slot */}
-          <div className="">
+          <div className=" bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <h4 className="text-gray-900 mb-4">Revenue by Time Slot</h4>
-            {/* Dynamic Field Dropdown */}
-            <div className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100">
-              <span className="text-[10px] uppercase font-bold text-purple-400">
-                Select Field:
-              </span>
+
+            {/* Dynamic Field Dropdown - Button Style */}
+            <div className="relative mb-4 inline-block">
               <select
                 value={currentFieldId}
                 onChange={(e) => onFieldChange(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-purple-700 focus:ring-0 border-none p-0 cursor-pointer"
+                className="w-full sm:w-auto appearance-none bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2.5 pr-10 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer border-none focus:ring-2 focus:ring-purple-300 focus:outline-none"
               >
                 {fieldsList.map((f) => (
-                  <option key={f.id} value={f.id}>
+                  <option
+                    key={f.id}
+                    value={f.id}
+                    className="bg-white text-gray-900"
+                  >
                     {f.name}
                   </option>
                 ))}
               </select>
+
+              {/* Down Arrow Icon */}
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white pointer-events-none" />
             </div>
-            <div className="w-full h-[300px]">
+
+            <div className="w-full h-[300px]  ">
               <ResponsiveContainer width="100%" height="100%">
-                {/* Added margin left to prevent label cutoff */}
                 <BarChart
                   data={revenueByTimeSlotData}
                   layout="vertical"
-                  margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                  margin={{ top: 5, right: 30, left: 4, bottom: 5 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -263,8 +269,8 @@ export function AnalyticsContent({
                     dataKey="slot"
                     stroke="#9ca3af"
                     fontSize={12}
-                    width={100} // Increased width for the labels
-                    tick={{ fill: "#6b7280" }} // Cleaner color for readability
+                    width={100}
+                    tick={{ fill: "#6b7280" }}
                   />
                   <Tooltip
                     cursor={{ fill: "transparent" }}
@@ -291,7 +297,8 @@ export function AnalyticsContent({
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex items-center gap-6 text-xs">
+
+            {/* <div className="mt-4 flex items-center gap-6 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
                 <span className="text-gray-600">Peak Hours</span>
@@ -304,13 +311,13 @@ export function AnalyticsContent({
                 <div className="w-3 h-3 rounded-full bg-gray-400" />
                 <span className="text-gray-600">Off-Peak</span>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 
         {/* Revenue by Day of Week & Payment Methods */}
-        <div className="grid grid-cols-2 gap-6">
-          <div>
+        <div className="grid lg:grid-cols-3 grid-cols-1 gap-6">
+          <div className="grid lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h4 className="text-gray-900 font-bold">
@@ -380,7 +387,7 @@ export function AnalyticsContent({
             </ResponsiveContainer>
           </div>
 
-          <div>
+          <div className="bg-white py-6 px-4 md:px-6 rounded-2xl border border-gray-100 shadow-sm">
             <h4 className="text-gray-900 mb-4">Payment Methods Distribution</h4>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -404,7 +411,7 @@ export function AnalyticsContent({
               {paymentMethodsChart.map((method, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between text-sm"
+                  className="flex items-center justify-between text-xs text-gray-700"
                 >
                   <div className="flex items-center gap-2">
                     <div
