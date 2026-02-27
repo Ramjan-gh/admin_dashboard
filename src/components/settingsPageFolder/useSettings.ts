@@ -135,8 +135,8 @@ export function useSettings() {
       const isEditing = !!newHoliday.id;
       // Using update_business_schedule for edits, add_business_schedule for new
       const rpcName = isEditing ? 'update_business_schedule' : 'add_business_schedule';
-      
-      const payload = isEditing 
+
+      const payload = isEditing
         ? { p_id: newHoliday.id, p_date: newHoliday.p_date, p_is_open: newHoliday.p_is_open, p_notes: newHoliday.p_notes }
         : { p_date: newHoliday.p_date, p_is_open: newHoliday.p_is_open, p_notes: newHoliday.p_notes };
 
@@ -219,7 +219,7 @@ export function useSettings() {
         headers: getHeaders(),
         body: JSON.stringify({ p_id: id, p_is_active: !currentStatus }),
       });
-      
+
       if (res.ok) {
         fetchAllData();
         return { success: true, message: "Status updated successfully" };
@@ -282,16 +282,17 @@ export function useSettings() {
     if (!accessToken) return toast.error("Login required");
 
     setBannerLoading(true);
+
     const fileName = `banner-${Date.now()}.${file.name.split(".").pop()}`;
     const uploadUrl = `${BASE_URL}/storage/v1/object/media/banners/${fileName}`;
 
     try {
       const storageRes = await fetch(uploadUrl, {
         method: "POST",
-        headers: { 
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, 
-          Authorization: `Bearer ${accessToken}`, 
-          "Content-Type": file.type 
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": file.type
         },
         body: file,
       });
@@ -302,10 +303,10 @@ export function useSettings() {
       const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/add_media`, {
         method: "POST",
         headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ 
-          p_use_case: "banner", 
-          p_media_type: "image", 
-          p_file_url: publicUrl 
+        body: JSON.stringify({
+          p_use_case: "banner",
+          p_media_type: "image",
+          p_file_url: publicUrl
         }),
       });
 
@@ -324,14 +325,31 @@ export function useSettings() {
 
   const handleDeleteBanner = async (banner: { id: any; file_url: string }): Promise<void> => {
     if (!confirm("Are you sure you want to delete this banner?")) return;
-    
+
     const accessToken = localStorage.getItem("sb-access-token");
     if (!accessToken) {
       toast.error("Login required");
-      return;
+      return; // Returns void
     }
 
     try {
+      const filePath = banner.file_url.split("/public/media/")[1];
+
+      // 1. Delete from Storage
+      const storageRes = await fetch(
+        `${BASE_URL}/storage/v1/object/media/${filePath}`,
+        {
+          method: "DELETE",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!storageRes.ok) throw new Error("Failed to delete from storage");
+
+      // 2. Delete from Database
       const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/delete_media_by_id`, {
         method: "POST",
         headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
@@ -342,12 +360,15 @@ export function useSettings() {
         setBanners((prev) => prev.filter((b) => b.id !== banner.id));
         toast.success("Banner deleted successfully");
       } else {
-        const errorData = await dbRes.json();
-        toast.error(errorData.message || "Failed to delete banner");
+        throw new Error("Failed to delete from database");
       }
     } catch (error) {
-      toast.error("Failed to delete banner");
+      const message = error instanceof Error ? error.message : "Failed to delete banner";
+      toast.error(message);
     }
+
+    // Explicitly return nothing to satisfy the 'void' requirement
+    return;
   };
 
   return {
