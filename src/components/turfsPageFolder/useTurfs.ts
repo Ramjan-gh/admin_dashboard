@@ -96,6 +96,9 @@ export function useTurfs() {
       return;
     }
 
+    // 1. Identify existing file to delete
+    const existingUrl = type === "bg" ? formData.background_image_url : formData.icon_url;
+
     const folder = type === "bg" ? "field_background_images" : "field_icons";
     const fileExt = file.name.split(".").pop();
     const slug = (formData.name || "field").toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -103,6 +106,30 @@ export function useTurfs() {
     const uploadUrl = `${BASE_URL}/storage/v1/object/media/${folder}/${fileName}`;
 
     try {
+      // 2. DELETE OLD FILE FROM STORAGE (if it exists and is a Supabase URL)
+      if (existingUrl && existingUrl.includes(BASE_URL)) {
+        try {
+          // Extract the path after /public/media/
+          // Example: https://.../public/media/field_icons/image.png -> field_icons/image.png
+          const filePath = existingUrl.split("/public/media/")[1];
+
+          if (filePath) {
+            await fetch(`${BASE_URL}/storage/v1/object/media/${filePath}`, {
+              method: "DELETE",
+              headers: {
+                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+            console.log("Old file deleted from storage");
+          }
+        } catch (delError) {
+          // We log the error but don't stop the upload of the new file
+          console.error("Failed to delete old file:", delError);
+        }
+      }
+
+      // 3. PROCEED WITH UPLOAD
       const response = await fetch(uploadUrl, {
         method: "POST",
         headers: {
@@ -120,7 +147,7 @@ export function useTurfs() {
           ...prev,
           [type === "bg" ? "background_image_url" : "icon_url"]: publicUrl,
         }));
-        toast.success(`${type === "bg" ? "Background image" : "Icon"} uploaded successfully!`);
+        toast.success(`${type === "bg" ? "Background image" : "Icon"} updated!`);
       } else {
         toast.error("Upload failed");
       }

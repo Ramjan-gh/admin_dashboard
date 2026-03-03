@@ -6,14 +6,14 @@ const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 // --- Interfaces for Form States ---
 interface NewHolidayState {
-  id?: string; // Presence of ID determines Edit vs Add
+  id?: string;
   p_date: string;
   p_is_open: boolean;
   p_notes: string;
 }
 
 interface NewDiscountState {
-  id?: string; // Presence of ID determines Edit vs Add
+  id?: string;
   p_code: string;
   p_discount_type: "percentage" | "fixed";
   p_discount_value: string;
@@ -28,19 +28,27 @@ interface ApiResponse {
   message: string;
 }
 
+interface MediaItem {
+  id: any;
+  file_url: string;
+  media_type: string;
+}
+
 export function useSettings() {
   const [activeTab, setActiveTab] = useState("general");
   const [hasChanges, setHasChanges] = useState(false);
   const [loading, setLoading] = useState(true);
   const [bannerLoading, setBannerLoading] = useState(false);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [gallery, setGallery] = useState<MediaItem[]>([]);
 
   // Data States
   const [orgData, setOrgData] = useState<Organization | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
-  const [banners, setBanners] = useState<{ id: any; file_url: string; media_type: string }[]>([]);
+  const [banners, setBanners] = useState<MediaItem[]>([]);
 
-  // Initial States (for resetting forms)
+  // Initial States
   const initialHoliday: NewHolidayState = { p_date: "", p_is_open: false, p_notes: "" };
   const initialDiscount: NewDiscountState = {
     p_code: "",
@@ -70,6 +78,47 @@ export function useSettings() {
     }
   }, [getHeaders]);
 
+  const fetchGallery = useCallback(async () => {
+    try {
+      const accessToken = localStorage.getItem("sb-access-token");
+      if (!accessToken) return;
+
+      const res = await fetch(`${BASE_URL}/storage/v1/object/list/media`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          prefix: "gallery/", // list files inside the gallery folder
+          limit: 100,
+          offset: 0,
+        }),
+      });
+
+      if (res.ok) {
+        const files = await res.json();
+        // console.log("Gallery files:", JSON.stringify(files, null, 2));
+
+        const mapped = files
+          .filter((f: any) => f.id !== null && f.name && f.name !== ".emptyFolderPlaceholder")
+          .map((f: any) => ({
+            id: `gallery/${f.name}`,
+            file_url: `${BASE_URL}/storage/v1/object/public/media/gallery/${f.name}`,
+            media_type: "image",
+          }));
+
+        setGallery(mapped);
+      } else {
+        const err = await res.json();
+        console.error("Gallery list error:", err);
+      }
+    } catch (err) {
+      console.error("Error fetching gallery:", err);
+    }
+  }, []);
+
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
@@ -84,12 +133,13 @@ export function useSettings() {
       if (Array.isArray(scheduleRes)) setHolidays(scheduleRes);
       if (Array.isArray(discountRes)) setDiscounts(discountRes);
       await fetchBanners();
+      await fetchGallery();
     } catch (error) {
       console.error("Error fetching settings:", error);
     } finally {
       setLoading(false);
     }
-  }, [getHeaders, fetchBanners]);
+  }, [getHeaders, fetchBanners, fetchGallery]);
 
   useEffect(() => {
     fetchAllData();
@@ -133,8 +183,7 @@ export function useSettings() {
 
     try {
       const isEditing = !!newHoliday.id;
-      // Using update_business_schedule for edits, add_business_schedule for new
-      const rpcName = isEditing ? 'update_business_schedule' : 'add_business_schedule';
+      const rpcName = isEditing ? "update_business_schedule" : "add_business_schedule";
 
       const payload = isEditing
         ? { p_id: newHoliday.id, p_date: newHoliday.p_date, p_is_open: newHoliday.p_is_open, p_notes: newHoliday.p_notes }
@@ -177,7 +226,7 @@ export function useSettings() {
     if (!newDiscount.p_code.trim()) return toast.error("Discount code is required");
     try {
       const isEditing = !!newDiscount.id;
-      const rpcName = isEditing ? 'update_discount' : 'add_discount';
+      const rpcName = isEditing ? "update_discount" : "add_discount";
 
       const payload = {
         ...(isEditing && { p_id: newDiscount.id }),
@@ -187,7 +236,7 @@ export function useSettings() {
         p_valid_from: newDiscount.p_valid_from,
         p_valid_until: newDiscount.p_valid_until,
         p_max_uses: newDiscount.p_max_uses,
-        p_is_active: newDiscount.p_is_active
+        p_is_active: newDiscount.p_is_active,
       };
 
       const res = await fetch(`${BASE_URL}/rest/v1/rpc/${rpcName}`, {
@@ -256,16 +305,19 @@ export function useSettings() {
 
     setLoading(true);
     const fileName = `logo-${Date.now()}.${file.name.split(".").pop()}`;
-    const uploadUrl = `${BASE_URL}/storage/v1/object/media/logo/${fileName}`;
 
     try {
-      const response = await fetch(uploadUrl, {
+      const response = await fetch(`${BASE_URL}/storage/v1/object/media/logo/${fileName}`, {
         method: "POST",
-        headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}`, "Content-Type": file.type },
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": file.type,
+        },
         body: file,
       });
       if (response.ok) {
-        const publicUrl = `${BASE_URL}/storage/v1/object/media/logo/${fileName}`;
+        const publicUrl = `${BASE_URL}/storage/v1/object/public/media/logo/${fileName}`;
         setOrgData({ ...orgData, logo_url: publicUrl });
         setHasChanges(true);
       }
@@ -277,22 +329,19 @@ export function useSettings() {
   const handleBannerUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const accessToken = localStorage.getItem("sb-access-token");
     if (!accessToken) return toast.error("Login required");
 
     setBannerLoading(true);
-
     const fileName = `banner-${Date.now()}.${file.name.split(".").pop()}`;
-    const uploadUrl = `${BASE_URL}/storage/v1/object/media/banners/${fileName}`;
 
     try {
-      const storageRes = await fetch(uploadUrl, {
+      const storageRes = await fetch(`${BASE_URL}/storage/v1/object/media/banners/${fileName}`, {
         method: "POST",
         headers: {
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": file.type
+          "Content-Type": file.type,
         },
         body: file,
       });
@@ -303,11 +352,7 @@ export function useSettings() {
       const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/add_media`, {
         method: "POST",
         headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          p_use_case: "banner",
-          p_media_type: "image",
-          p_file_url: publicUrl
-        }),
+        body: JSON.stringify({ p_use_case: "banner", p_media_type: "image", p_file_url: publicUrl }),
       });
 
       if (dbRes.ok) {
@@ -323,52 +368,90 @@ export function useSettings() {
     }
   };
 
-  const handleDeleteBanner = async (banner: { id: any; file_url: string }): Promise<void> => {
+  const handleDeleteBanner = async (banner: MediaItem): Promise<void> => {
     if (!confirm("Are you sure you want to delete this banner?")) return;
-
     const accessToken = localStorage.getItem("sb-access-token");
-    if (!accessToken) {
-      toast.error("Login required");
-      return; // Returns void
-    }
+    if (!accessToken) { toast.error("Login required"); return; }
 
     try {
-      const filePath = banner.file_url.split("/public/media/")[1];
-
-      // 1. Delete from Storage
-      const storageRes = await fetch(
-        `${BASE_URL}/storage/v1/object/media/${filePath}`,
-        {
-          method: "DELETE",
-          headers: {
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!storageRes.ok) throw new Error("Failed to delete from storage");
-
-      // 2. Delete from Database
       const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/delete_media_by_id`, {
         method: "POST",
         headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ p_media_id: banner.id }),
       });
 
-      if (dbRes.ok) {
-        setBanners((prev) => prev.filter((b) => b.id !== banner.id));
-        toast.success("Banner deleted successfully");
-      } else {
-        throw new Error("Failed to delete from database");
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete banner";
-      toast.error(message);
-    }
+      if (!dbRes.ok) throw new Error("Failed to delete record from database. Storage was not cleared.");
 
-    // Explicitly return nothing to satisfy the 'void' requirement
-    return;
+      setBanners((prev) => prev.filter((b) => b.id !== banner.id));
+
+      const filePath = banner.file_url.split("/public/media/")[1];
+      if (filePath) {
+        const storageRes = await fetch(`${BASE_URL}/storage/v1/object/media/${filePath}`, {
+          method: "DELETE",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (!storageRes.ok) console.warn("Database record deleted, but file remained in storage bucket.");
+      }
+
+      toast.success("Banner deleted successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete banner");
+    }
+  };
+
+  // --- GALLERY ---
+  const handleGalleryUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const accessToken = localStorage.getItem("sb-access-token");
+    if (!accessToken) return toast.error("Login required");
+
+    setGalleryLoading(true);
+    const fileName = `gallery-${Date.now()}.${file.name.split(".").pop()}`;
+
+    try {
+      const res = await fetch(`${BASE_URL}/storage/v1/object/media/gallery/${fileName}`, {
+        method: "POST",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+      if (!res.ok) throw new Error("Failed to upload image");
+      toast.success("Image uploaded successfully!");
+      fetchGallery();
+    } catch (error: any) {
+      toast.error(error.message || "Upload failed");
+    } finally {
+      setGalleryLoading(false);
+    }
+  };
+
+  const handleDeleteGalleryItem = async (item: MediaItem): Promise<void> => {
+    if (!confirm("Are you sure you want to delete this image?")) return;
+    const accessToken = localStorage.getItem("sb-access-token");
+    if (!accessToken) { toast.error("Login required"); return; }
+
+    try {
+      // item.id is the full path from the bucket e.g. "gallery/gallery-123.jpg" or "gallery-123.jpg"
+      const res = await fetch(`${BASE_URL}/storage/v1/object/media/${item.id}`, {
+        method: "DELETE",
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (!res.ok) throw new Error("Failed to delete image");
+      setGallery((prev) => prev.filter((g) => g.id !== item.id));
+      toast.success("Image deleted successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete image");
+    }
   };
 
   return {
@@ -376,6 +459,7 @@ export function useSettings() {
     holidays, discounts, newHoliday, setNewHoliday, newDiscount, setNewDiscount,
     banners, bannerLoading, handleUpdateOrg, handleAddSchedule, handleDeleteSchedule,
     handleAddDiscount, handleDeleteDiscount, handleToggleDiscountStatus, handleLogoUpload,
-    handleBannerUpload, handleDeleteBanner
+    handleBannerUpload, handleDeleteBanner,
+    gallery, galleryLoading, handleGalleryUpload, handleDeleteGalleryItem,
   };
 }

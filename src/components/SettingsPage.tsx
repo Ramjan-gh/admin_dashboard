@@ -1,8 +1,9 @@
-import { Building, Calendar, Tag, AlertCircle, Loader2 } from "lucide-react";
+import { Building, Calendar, Tag, AlertCircle, Loader2, Images } from "lucide-react";
 import { GeneralSettings } from "./settingsPageFolder/generalSettingsFolder/GeneralSettings";
 import { HolidaySettings } from "./settingsPageFolder/HolidaySettings";
 import { DiscountSettings } from "./settingsPageFolder/discountSettingsFolder/DiscountSettings";
 import { useSettings } from "./settingsPageFolder/useSettings"; 
+import { GallerySettings } from "./settingsPageFolder/generalSettingsFolder/GallerySettings";
 
 export function SettingsPage() {
   const {
@@ -29,6 +30,10 @@ export function SettingsPage() {
     handleLogoUpload,
     handleBannerUpload,
     handleDeleteBanner,
+    gallery,
+    galleryLoading,
+    handleGalleryUpload,
+    handleDeleteGalleryItem,
     setHasChanges,
   } = useSettings();
 
@@ -43,6 +48,7 @@ export function SettingsPage() {
     { id: "general", label: "General", icon: Building },
     { id: "holidays", label: "Holidays", icon: Calendar },
     { id: "discounts", label: "Discounts", icon: Tag },
+    { id: "gallery", label: "Gallery", icon: Images },
   ];
 
   return (
@@ -115,6 +121,15 @@ export function SettingsPage() {
               handleAddDiscount={handleAddDiscount}
               handleDeleteDiscount={handleDeleteDiscount}
               handleToggleDiscountStatus={handleToggleDiscountStatus}
+            />
+          )}
+
+          {activeTab === "gallery" && (
+            <GallerySettings
+              banners={gallery}
+              loading={galleryLoading}
+              onUpload={handleGalleryUpload}
+              onDelete={handleDeleteGalleryItem}
             />
           )}
         </div>
