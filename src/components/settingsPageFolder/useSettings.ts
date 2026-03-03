@@ -81,43 +81,23 @@ export function useSettings() {
   const fetchGallery = useCallback(async () => {
     try {
       const accessToken = localStorage.getItem("sb-access-token");
-      if (!accessToken) return;
-
-      const res = await fetch(`${BASE_URL}/storage/v1/object/list/media`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          prefix: "gallery/", // list files inside the gallery folder
-          limit: 100,
-          offset: 0,
-        }),
-      });
+      const res = await fetch(
+        `${BASE_URL}/rest/v1/media?use_case=eq.gallery&select=id,file_url,media_type&order=created_at.desc`,
+        {
+          method: "GET",
+          headers: { ...getHeaders(), Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+        }
+      );
 
       if (res.ok) {
-        const files = await res.json();
-        // console.log("Gallery files:", JSON.stringify(files, null, 2));
-
-        const mapped = files
-          .filter((f: any) => f.id !== null && f.name && f.name !== ".emptyFolderPlaceholder")
-          .map((f: any) => ({
-            id: `gallery/${f.name}`,
-            file_url: `${BASE_URL}/storage/v1/object/public/media/gallery/${f.name}`,
-            media_type: "image",
-          }));
-
-        setGallery(mapped);
-      } else {
-        const err = await res.json();
-        console.error("Gallery list error:", err);
+        const data = await res.json();
+        console.log("Gallery data:", data);
+        setGallery(data);
       }
     } catch (err) {
       console.error("Error fetching gallery:", err);
     }
-  }, []);
+  }, [getHeaders]);
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -413,7 +393,7 @@ export function useSettings() {
     const fileName = `gallery-${Date.now()}.${file.name.split(".").pop()}`;
 
     try {
-      const res = await fetch(`${BASE_URL}/storage/v1/object/media/gallery/${fileName}`, {
+      const storageRes = await fetch(`${BASE_URL}/storage/v1/object/media/gallery/${fileName}`, {
         method: "POST",
         headers: {
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -422,11 +402,24 @@ export function useSettings() {
         },
         body: file,
       });
-      if (!res.ok) throw new Error("Failed to upload image");
-      toast.success("Image uploaded successfully!");
-      fetchGallery();
+
+      if (!storageRes.ok) throw new Error("Failed to upload image to storage");
+
+      const publicUrl = `${BASE_URL}/storage/v1/object/public/media/gallery/${fileName}`;
+      const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/add_media`, {
+        method: "POST",
+        headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ p_use_case: "gallery", p_media_type: "image", p_file_url: publicUrl }),
+      });
+
+      if (dbRes.ok) {
+        toast.success("Image uploaded successfully!");
+        fetchGallery();
+      } else {
+        throw new Error("Failed to save image details to database");
+      }
     } catch (error: any) {
-      toast.error(error.message || "Upload failed");
+      toast.error(error.message || "An error occurred during gallery upload");
     } finally {
       setGalleryLoading(false);
     }
@@ -438,16 +431,29 @@ export function useSettings() {
     if (!accessToken) { toast.error("Login required"); return; }
 
     try {
-      // item.id is the full path from the bucket e.g. "gallery/gallery-123.jpg" or "gallery-123.jpg"
-      const res = await fetch(`${BASE_URL}/storage/v1/object/media/${item.id}`, {
-        method: "DELETE",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
+      // 1. DELETE FROM DATABASE
+      const dbRes = await fetch(`${BASE_URL}/rest/v1/rpc/delete_media_by_id`, {
+        method: "POST",
+        headers: { ...getHeaders(), Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ p_media_id: item.id }),
       });
-      if (!res.ok) throw new Error("Failed to delete image");
+
+      if (!dbRes.ok) throw new Error("Failed to delete record from database.");
+
       setGallery((prev) => prev.filter((g) => g.id !== item.id));
+
+      // 2. DELETE FROM STORAGE
+      const filePath = item.file_url.split("/public/media/")[1];
+      if (filePath) {
+        await fetch(`${BASE_URL}/storage/v1/object/media/${filePath}`, {
+          method: "DELETE",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+      }
+
       toast.success("Image deleted successfully");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete image");
