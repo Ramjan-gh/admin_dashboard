@@ -5,7 +5,11 @@ import { TurfCard } from "./turfsPageFolder/TurfCard";
 import { TurfModal } from "./turfsPageFolder/TurfModal";
 import { useTurfs } from "./turfsPageFolder/useTurfs";
 
-export function TurfsPage() {
+type Props = {
+  onSessionExpired: () => void;
+};
+
+export function TurfsPage({ onSessionExpired }: Props) {
   const {
     turfs,
     formData,
@@ -20,7 +24,7 @@ export function TurfsPage() {
     handleSubmit,
     handleDelete,
     openModal,
-  } = useTurfs();
+  } = useTurfs(onSessionExpired);
 
   return (
     <>

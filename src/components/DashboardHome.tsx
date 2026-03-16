@@ -13,6 +13,7 @@ import {
 import { RevenueTrendChart } from "./RevenueTrendChart";
 import { RevenueDistributionPie } from "./RevenueDistributionPie";
 import { AnalyticsContent } from "./AnalyticsContent";
+import { authFetch } from "./Authutils";
 
 const calculateWeeksBetween = (start: string, end: string): number => {
   const d1 = new Date(start);
@@ -22,20 +23,28 @@ const calculateWeeksBetween = (start: string, end: string): number => {
   return Math.max(1, Math.ceil(diffInDays / 7));
 };
 
-export function DashboardHome() {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Props = {
+  onSessionExpired: () => void;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function DashboardHome({ onSessionExpired }: Props) {
   // 1. Core State
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
-    date.setDate(date.getDate() - 10); // 10 days ago
+    date.setDate(date.getDate() - 10);
     return date.toISOString().split("T")[0];
   });
 
   const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split("T")[0]; // Today
+    return new Date().toISOString().split("T")[0];
   });
+
   const [fieldId, setFieldId] = useState<string>("");
   const [fieldsList, setFieldsList] = useState<any[]>([]);
-
   const [apiData, setApiData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,37 +67,37 @@ export function DashboardHome() {
     bookingFrequency: [],
   });
 
-  // 2. Data Fetching Logic
+  // 2. Data Fetching
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const headers = {
-      "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    };
-
     const baseUrl = "https://himsgwtkvewhxvmjapqa.supabase.co/rest/v1/rpc";
+
+    // Shorthand: GET request via authFetch
+    const get = (path: string) =>
+      authFetch(`${baseUrl}/${path}`, { method: "GET" }, onSessionExpired).then(
+        (res) => (res.ok ? res.json() : []),
+      );
 
     try {
       const weeksToAnalyze = calculateWeeksBetween(startDate, endDate);
-      console.log(`Fetching pattern for ${weeksToAnalyze} weeks`);
-      // Step A: Always get the latest list of fields
-      const fieldsRes = await fetch(`${baseUrl}/get_fields`, { headers });
+
+      // Step A: Get latest list of fields
+      const fieldsRes = await authFetch(
+        `${baseUrl}/get_fields`,
+        { method: "GET" },
+        onSessionExpired,
+      );
       const availableFields = fieldsRes.ok ? await fieldsRes.json() : [];
       setFieldsList(availableFields);
 
-      // Step B: Determine which Field ID to use for the detailed queries
-      // If we don't have a fieldId yet, default to the first one in the list
+      // Step B: Determine active field ID
       const activeFieldId =
         fieldId || (availableFields.length > 0 ? availableFields[0].id : null);
+      if (!fieldId && activeFieldId) setFieldId(activeFieldId);
 
-      if (!fieldId && activeFieldId) {
-        setFieldId(activeFieldId);
-      }
-
-      // Step C: Fetch all analytics data in parallel
+      // Step C: Fetch all analytics in parallel
       const [
         trendRes,
         fields,
@@ -101,74 +110,59 @@ export function DashboardHome() {
         fieldUtilization,
         userVsGuest,
       ] = await Promise.all([
-        fetch(
-          `${baseUrl}/get_revenue_trend?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
+        get(`get_revenue_trend?start_date=${startDate}&end_date=${endDate}`),
 
-        fetch(
-          `${baseUrl}/get_revenue_by_field?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
+        get(`get_revenue_by_field?start_date=${startDate}&end_date=${endDate}`),
 
-        fetch(
-          `${baseUrl}/get_weekly_revenue_pattern?weeks_to_analyze=${weeksToAnalyze}`,
-          {
-            headers,
-          },
-        ).then((res) => (res.ok ? res.json() : [])),
+        get(`get_weekly_revenue_pattern?weeks_to_analyze=${weeksToAnalyze}`),
 
-        fetch(
+        authFetch(
           `${baseUrl}/get_revenue_by_time_slot?p_field_id=${activeFieldId}&start_date=${startDate}&end_date=${endDate}`,
-          { headers },
+          { method: "GET" },
+          onSessionExpired,
         ).then(async (res) => {
           if (!res.ok) {
-            const err = await res.json();
-            console.error("❌ Time Slot API Error:", err);
+            console.error("❌ Time Slot API Error:", await res.json());
             return [];
           }
           return res.json();
         }),
 
-        fetch(
-          `${baseUrl}/get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
+        get(
+          `get_payment_methods_distribution?start_date=${startDate}&end_date=${endDate}`,
+        ),
 
-        fetch(
-          `${baseUrl}/get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
-        fetch(
-          `${baseUrl}/get_booking_volume_trends?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
-        fetch(
+        get(
+          `get_discount_code_performance?start_date=${startDate}&end_date=${endDate}`,
+        ),
+
+        get(
+          `get_booking_volume_trends?start_date=${startDate}&end_date=${endDate}`,
+        ),
+
+        authFetch(
           `${baseUrl}/get_popular_time_slots_heatmap?p_field_id=${activeFieldId}&start_date=${startDate}&end_date=${endDate}`,
-          { headers },
+          { method: "GET" },
+          onSessionExpired,
         ).then(async (res) => {
           if (!res.ok) {
-            const err = await res.json();
-            console.error("❌ Popular Time Slots API Error:", err);
+            console.error("❌ Popular Time Slots API Error:", await res.json());
             return [];
           }
           return res.json();
         }),
-        fetch(
-          `${baseUrl}/get_field_utilization_rates?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
-        fetch(
-          `${baseUrl}/get_user_vs_guest_booking_trends?start_date=${startDate}&end_date=${endDate}`,
-          { headers },
-        ).then((res) => (res.ok ? res.json() : [])),
+
+        get(
+          `get_field_utilization_rates?start_date=${startDate}&end_date=${endDate}`,
+        ),
+
+        get(
+          `get_user_vs_guest_booking_trends?start_date=${startDate}&end_date=${endDate}`,
+        ),
       ]);
 
-      // Debugging Log
       console.log("user vs guest:", userVsGuest);
 
-
-      // Update States
       setApiData(trendRes);
       setAnalyticsData((prev) => ({
         ...prev,
@@ -178,9 +172,9 @@ export function DashboardHome() {
         paymentMethods: payments,
         discountPerformance: discounts,
         bookingVolumeTrends: bookingVolume,
-        timeSlotHeatMap: timeSlotHeatMap,
-        fieldUtilization: fieldUtilization,
-        userVsGuest: userVsGuest,
+        timeSlotHeatMap,
+        fieldUtilization,
+        userVsGuest,
       }));
     } catch (err: any) {
       console.error("Full Data Sync Error:", err);
@@ -190,16 +184,18 @@ export function DashboardHome() {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, fieldId]);
+  }, [startDate, endDate, fieldId, onSessionExpired]);
 
   // 3. Effect Hooks
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto bg-gray-50/50 min-h-screen">
-      {/* Header Section */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Revenue Analysis</h1>
@@ -211,7 +207,6 @@ export function DashboardHome() {
         {/* Date Range Picker */}
         <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Calendar className="w-4 h-4 text-gray-400 ml-2 hidden sm:block" />
-
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <input
               type="date"
@@ -227,7 +222,6 @@ export function DashboardHome() {
               className="text-sm border-none focus:ring-0 w-full sm:w-auto"
             />
           </div>
-
           <button
             onClick={fetchData}
             className="p-2 hover:bg-purple-50 rounded-lg text-purple-600 transition-colors self-center sm:self-auto"
@@ -243,7 +237,7 @@ export function DashboardHome() {
         </div>
       ) : (
         <>
-          {/* Top Charts Row */}
+          {/* Top Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <RevenueTrendChart
               data={apiData}
@@ -256,7 +250,7 @@ export function DashboardHome() {
             </div>
           </div>
 
-          {/* Detailed Analytics Tabs Container */}
+          {/* Analytics Tabs */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="border-b border-gray-100 px-6">
               <div className="flex space-x-8">

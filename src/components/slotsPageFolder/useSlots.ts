@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Slot, Shift, Field } from "../types";
+import { authFetch } from ".././Authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
-export function useSlots() {
+export function useSlots(onSessionExpired: () => void) {
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
@@ -15,31 +16,35 @@ export function useSlots() {
   const getHeaders = useCallback(() => ({
     "Content-Type": "application/json",
     apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
   }), []);
 
-  const fetchFields = async () => {
+  // Shorthand for POST via authFetch
+  const post = useCallback((path: string, body?: any) =>
+    authFetch(
+      `${BASE_URL}/rest/v1/rpc/${path}`,
+      { method: "POST", headers: getHeaders(), body: body ? JSON.stringify(body) : undefined },
+      onSessionExpired,
+    ),
+    [getHeaders, onSessionExpired]);
+
+  const fetchFields = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_fields`, {
-        method: "POST",
-        headers: getHeaders(),
-      });
+      const res = await post("get_fields");
       const data = await res.json();
       setFields(data);
       if (data.length > 0 && !selectedFieldId) setSelectedFieldId(data[0].id);
     } catch (err) {
       console.error("Fetch fields error:", err);
     }
-  };
+  }, [post, selectedFieldId]);
 
   const fetchSlots = useCallback(async () => {
     if (!selectedFieldId || !selectedDate) return;
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_slots_with_booking_details`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ p_field_id: selectedFieldId, p_booking_date: selectedDate }),
+      const res = await post("get_slots_with_booking_details", {
+        p_field_id: selectedFieldId,
+        p_booking_date: selectedDate,
       });
       const data = await res.json();
       setShifts(data.map((g: any) => ({ shift_id: g.shift_id, shift_name: g.shift_name })));
@@ -54,31 +59,24 @@ export function useSlots() {
     } finally {
       setLoading(false);
     }
-  }, [selectedFieldId, selectedDate, getHeaders]);
+  }, [selectedFieldId, selectedDate, post]);
 
-  useEffect(() => { fetchFields(); }, []);
+  useEffect(() => { fetchFields(); }, [fetchFields]);
   useEffect(() => { fetchSlots(); }, [fetchSlots]);
 
   // --- API Handlers ---
 
   const handleUpdateShift = async (payload: any) => {
     const execution = (async () => {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_shift`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const res = await post("update_shift", payload);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || "Failed to update shift");
-      }
+      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to update shift");
       fetchSlots();
       return data;
     })();
-
     toast.promise(execution, {
-      loading: 'Updating shift...',
-      success: (data) => data.message || 'Shift updated successfully',
+      loading: "Updating shift...",
+      success: (data) => data.message || "Shift updated successfully",
       error: (err) => err.message,
     });
     return execution;
@@ -86,22 +84,15 @@ export function useSlots() {
 
   const handleAddSlot = async (payload: any) => {
     const execution = (async () => {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_slot`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const res = await post("add_slot", payload);
       const data = await res.json();
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || "Failed to add slot");
-      }
+      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to add slot");
       fetchSlots();
       return data;
     })();
-
     toast.promise(execution, {
-      loading: 'Adding slot...',
-      success: (data) => data.message || 'Slot added successfully',
+      loading: "Adding slot...",
+      success: (data) => data.message || "Slot added successfully",
       error: (err) => err.message,
     });
     return execution;
@@ -110,22 +101,15 @@ export function useSlots() {
   const handleDeleteSlot = async (slotId: string) => {
     if (!confirm("Are you sure?")) return;
     const execution = (async () => {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_slot`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ p_slot_id: slotId }),
-      });
+      const res = await post("delete_slot", { p_slot_id: slotId });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || "Failed to delete slot");
-      }
+      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to delete slot");
       fetchSlots();
       return data;
     })();
-
     toast.promise(execution, {
-      loading: 'Deleting slot...',
-      success: (data) => data.message || 'Slot deleted',
+      loading: "Deleting slot...",
+      success: (data) => data.message || "Slot deleted",
       error: (err) => err.message,
     });
     return execution;
@@ -133,23 +117,15 @@ export function useSlots() {
 
   const handleAddShift = async (shiftData: any) => {
     const execution = (async () => {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/add_shift`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(shiftData),
-      });
+      const res = await post("add_shift", shiftData);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) {
-        // This will display "A shift named '...' already exists" if that's what the API returns
-        throw new Error(data.message || "Failed to add shift");
-      }
+      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to add shift");
       fetchSlots();
       return data;
     })();
-
     toast.promise(execution, {
-      loading: 'Creating new shift...',
-      success: (data) => data.message || 'Shift created successfully',
+      loading: "Creating new shift...",
+      success: (data) => data.message || "Shift created successfully",
       error: (err) => err.message,
     });
     return execution;
@@ -158,22 +134,15 @@ export function useSlots() {
   const handleDeleteShift = async (shiftId: string) => {
     if (!confirm("Delete this shift and all its slots permanently?")) return;
     const execution = (async () => {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/delete_shift`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify({ p_shift_id: shiftId }),
-      });
+      const res = await post("delete_shift", { p_shift_id: shiftId });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || "Failed to delete shift");
-      }
+      if (!res.ok || data.success === false) throw new Error(data.message || "Failed to delete shift");
       fetchSlots();
       return data;
     })();
-
     toast.promise(execution, {
-      loading: 'Deleting shift...',
-      success: (data) => data.message || 'Shift deleted successfully',
+      loading: "Deleting shift...",
+      success: (data) => data.message || "Shift deleted successfully",
       error: (err) => err.message,
     });
     return execution;
@@ -181,30 +150,22 @@ export function useSlots() {
 
   const handleToggleMaintenance = async (slot: Slot) => {
     const isMaintenance = slot.status === "maintenance";
-    const actionText = isMaintenance ? "Removing from maintenance..." : "Setting maintenance...";
-    
     const execution = (async () => {
-      const endpoint = isMaintenance ? "remove_slot_from_maintenance" : "reserve_slot_for_maintenance";
-      const body = isMaintenance 
-        ? { p_maintenance_id: (slot as any).maintenance_id } 
+      const endpoint = isMaintenance
+        ? "remove_slot_from_maintenance"
+        : "reserve_slot_for_maintenance";
+      const body = isMaintenance
+        ? { p_maintenance_id: (slot as any).maintenance_id }
         : { p_slot_id: slot.slot_id, p_date: selectedDate };
-
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/${endpoint}`, {
-        method: "POST",
-        headers: getHeaders(),
-        body: JSON.stringify(body),
-      });
+      const res = await post(endpoint, body);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) {
-        throw new Error(data.message || "Maintenance update failed");
-      }
+      if (!res.ok || data.success === false) throw new Error(data.message || "Maintenance update failed");
       fetchSlots();
       return data;
     })();
-
     toast.promise(execution, {
-      loading: actionText,
-      success: (data) => data.message || 'Status updated',
+      loading: isMaintenance ? "Removing from maintenance..." : "Setting maintenance...",
+      success: (data) => data.message || "Status updated",
       error: (err) => err.message,
     });
     return execution;
@@ -213,6 +174,6 @@ export function useSlots() {
   return {
     fields, selectedFieldId, setSelectedFieldId, selectedDate, setSelectedDate,
     slots, shifts, loading, handleUpdateShift, handleAddSlot, handleDeleteSlot,
-    handleAddShift, handleDeleteShift, handleToggleMaintenance, fetchSlots
+    handleAddShift, handleDeleteShift, handleToggleMaintenance, fetchSlots,
   };
 }

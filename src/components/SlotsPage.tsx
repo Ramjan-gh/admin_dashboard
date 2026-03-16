@@ -8,21 +8,43 @@ import { UpdateShiftModal } from "./slotsPageFolder/UpdateShiftModal";
 import { useSlots } from "./slotsPageFolder/useSlots";
 import { toast } from "sonner";
 
-export function SlotsPage() {
-  const {
-    fields, selectedFieldId, setSelectedFieldId, selectedDate, setSelectedDate,
-    slots, shifts, loading, handleUpdateShift, handleAddSlot, handleDeleteSlot,
-    handleAddShift, handleDeleteShift, handleToggleMaintenance
-  } = useSlots();
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-  // --- UI State (Modals) ---
+type Props = {
+  onSessionExpired: () => void;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function SlotsPage({ onSessionExpired }: Props) {
+  const {
+    fields,
+    selectedFieldId,
+    setSelectedFieldId,
+    selectedDate,
+    setSelectedDate,
+    slots,
+    shifts,
+    loading,
+    handleUpdateShift,
+    handleAddSlot,
+    handleDeleteSlot,
+    handleAddShift,
+    handleDeleteShift,
+    handleToggleMaintenance,
+  } = useSlots(onSessionExpired);
+
+  // --- UI State ---
   const [fieldDropdownOpen, setFieldDropdownOpen] = useState(false);
   const [addSlotModalOpen, setAddSlotModalOpen] = useState(false);
   const [addShiftModalOpen, setAddShiftModalOpen] = useState(false);
   const [updateShiftModalOpen, setUpdateShiftModalOpen] = useState(false);
-  
+
   const [modalShiftId, setModalShiftId] = useState<string | null>(null);
-  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{id: string; name: string} | null>(null);
+  const [selectedShiftForEdit, setSelectedShiftForEdit] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [modalStartTime, setModalStartTime] = useState("10:00");
   const [modalEndTime, setModalEndTime] = useState("11:00");
@@ -33,10 +55,14 @@ export function SlotsPage() {
   const formatTime = (t: string) => t.slice(0, 5);
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "available": return "border-green-300 bg-green-50 hover:bg-green-100";
-      case "booked": return "border-purple-300 bg-purple-50";
-      case "maintenance": return "border-red-300 bg-red-50";
-      default: return "";
+      case "available":
+        return "border-green-300 bg-green-50 hover:bg-green-100";
+      case "booked":
+        return "border-purple-300 bg-purple-50";
+      case "maintenance":
+        return "border-red-300 bg-red-50";
+      default:
+        return "";
     }
   };
 
@@ -44,18 +70,13 @@ export function SlotsPage() {
   const onAddSlotSubmit = async (shiftId: string) => {
     setIsProcessing(true);
     try {
-      // handleAddSlot in useSlots now handles toast.promise internally
       await handleAddSlot({
         p_shift_id: shiftId,
         p_start_time: modalStartTime + ":00",
         p_end_time: modalEndTime + ":00",
       });
-
-      // If we get here, the promise resolved successfully
       setAddSlotModalOpen(false);
     } catch (error) {
-      // The hook already showed the specific API error toast,
-      // so we just log it for debugging here.
       console.error("Submission error:", error);
     } finally {
       setIsProcessing(false);
@@ -87,7 +108,7 @@ export function SlotsPage() {
           onClick={() => setAddShiftModalOpen(true)}
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg active:scale-95"
         >
-          <Plus className="w-5 h-5" />{" "}
+          <Plus className="w-5 h-5" />
           <span className="font-medium">Add New Shift</span>
         </button>
       </div>
@@ -183,14 +204,12 @@ export function SlotsPage() {
       <AddSlotModal
         isOpen={addSlotModalOpen}
         onClose={() => setAddSlotModalOpen(false)}
-        // Matches the (shiftId: string) => void signature
         onAdd={(sid: string) => {
           onAddSlotSubmit(sid);
         }}
         shiftName={shifts.find((s) => s.shift_id === modalShiftId)?.shift_name}
         loading={isProcessing}
         shiftId={modalShiftId}
-        // Passing these props allows the Modal to update the parent's state
         startTime={modalStartTime}
         setStartTime={setModalStartTime}
         endTime={modalEndTime}

@@ -5,7 +5,11 @@ import { DiscountSettings } from "./settingsPageFolder/discountSettingsFolder/Di
 import { useSettings } from "./settingsPageFolder/useSettings"; 
 import { GallerySettings } from "./settingsPageFolder/generalSettingsFolder/GallerySettings";
 
-export function SettingsPage() {
+type Props = {
+  onSessionExpired: () => void;
+};
+
+export function SettingsPage({ onSessionExpired }: Props) {
   const {
     activeTab,
     setActiveTab,
@@ -35,7 +39,7 @@ export function SettingsPage() {
     handleGalleryUpload,
     handleDeleteGalleryItem,
     setHasChanges,
-  } = useSettings();
+  } = useSettings(onSessionExpired);
 
   if (loading)
     return (
@@ -126,7 +130,7 @@ export function SettingsPage() {
 
           {activeTab === "gallery" && (
             <GallerySettings
-              banners={gallery}
+              gallery={gallery}
               loading={galleryLoading}
               onUpload={handleGalleryUpload}
               onDelete={handleDeleteGalleryItem}

@@ -1,13 +1,24 @@
 import { Plus, Trash2, Loader2, Images } from "lucide-react";
 
-import { Props } from "../../types";
+interface MediaItem {
+  id: any;
+  file_url: string;
+  media_type: string;
+}
+
+interface GallerySettingsProps {
+  gallery: MediaItem[];
+  loading: boolean;
+  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDelete: (item: MediaItem) => void;
+}
 
 export function GallerySettings({
-  banners,
+  gallery,
   loading,
   onUpload,
   onDelete,
-}: Props) {
+}: GallerySettingsProps) {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -31,18 +42,18 @@ export function GallerySettings({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {banners.map((banner) => (
+        {gallery.map((item) => (
           <div
-            key={banner.id}
+            key={item.id}
             className="relative group rounded-xl overflow-hidden border"
           >
             <img
-              src={banner.file_url}
+              src={item.file_url}
               className="w-full h-40 object-cover"
               alt="Gallery Image"
             />
             <button
-              onClick={() => onDelete(banner)}
+              onClick={() => onDelete(item)}
               className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <Trash2 className="w-4 h-4" />

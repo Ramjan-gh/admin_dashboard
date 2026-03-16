@@ -1,6 +1,10 @@
 import { User, Mail, Shield, Calendar, MapPin, BadgeCheck } from "lucide-react";
 
-export function ProfilePage() {
+type Props = {
+  onSessionExpired: () => void;
+};
+
+export function ProfilePage({ onSessionExpired }: Props) {
   // Get user data from localStorage
   const userJson = localStorage.getItem("sb-user");
   const user = userJson ? JSON.parse(userJson) : null;
@@ -16,8 +20,6 @@ export function ProfilePage() {
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-      
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20">
         {/* Left Column: Brief Stats */}
         <div className="space-y-6">
@@ -77,7 +79,6 @@ export function ProfilePage() {
                   <p className="text-sm  text-gray-900">{email}</p>
                 </div>
               </div>
-              
             </div>
           </div>
 

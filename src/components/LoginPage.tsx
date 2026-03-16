@@ -2,12 +2,9 @@ import { useState } from "react";
 import { LogIn, Lock, Mail, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-// Types
 import { LoginPageProps } from "./types";
 
 const AUTH_URL = "https://himsgwtkvewhxvmjapqa.supabase.co/auth/v1";
-
-
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   const [email, setEmail] = useState("");
@@ -32,14 +29,16 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
       const data = await res.json();
 
       if (res.ok && data.access_token) {
-        // Save auth data to localStorage
         localStorage.setItem("sb-access-token", data.access_token);
+        localStorage.setItem("sb-refresh-token", data.refresh_token); // ← NEW
         localStorage.setItem("sb-user", JSON.stringify(data.user));
         onLoginSuccess();
       } else {
-        toast.error(data.error_description || data.message || "Invalid credentials");
+        toast.error(
+          data.error_description || data.message || "Invalid credentials",
+        );
       }
-    } catch (err) {
+    } catch {
       toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -49,7 +48,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-        {/* Header Section */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 text-blue-600 rounded-full mb-4">
             <LogIn className="w-8 h-8" />
@@ -61,13 +59,12 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Email Address
             </label>
             <div className="relative flex items-center">
-              <div className="absolute left-3 flex items-center justify-center pointer-events-none">
+              <div className="absolute left-3 pointer-events-none">
                 <Mail className="w-5 h-5 text-gray-400" />
               </div>
               <input
@@ -81,13 +78,12 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </div>
           </div>
 
-          {/* Password Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Password
             </label>
             <div className="relative flex items-center">
-              <div className="absolute left-3 flex items-center justify-center pointer-events-none">
+              <div className="absolute left-3 pointer-events-none">
                 <Lock className="w-5 h-5 text-gray-400" />
               </div>
               <input
@@ -101,7 +97,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 flex items-center justify-center p-1 text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
+                className="absolute right-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
@@ -113,7 +109,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             </div>
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}

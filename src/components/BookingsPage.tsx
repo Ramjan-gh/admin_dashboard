@@ -6,12 +6,21 @@ import { BookingFilters } from "./bookingsPageFolder/BookingFilters";
 import { BookingsTable } from "./bookingsPageFolder/BookingsTable";
 import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer";
 import { UpdateBookingModal } from "./bookingsPageFolder/UpdateBookingModal";
-import { BookingPopup } from "./bookingsPageFolder/BookingPopup"; // ADD THIS
+import { BookingPopup } from "./bookingsPageFolder/BookingPopup";
 import { toast } from "sonner";
+import { authFetch } from "./Authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
-export function BookingsPage() {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Props = {
+  onSessionExpired: () => void;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function BookingsPage({ onSessionExpired }: Props) {
   const [showBookingPopup, setShowBookingPopup] = useState(false);
   const [editingBooking, setEditingBooking] = useState<BookingDetails | null>(
     null,
@@ -32,29 +41,37 @@ export function BookingsPage() {
 
   useEffect(() => {
     fetchBookings();
-  }, [search, bookingDate, fieldFilter, paymentStatus, offset]);
+  }, [
+    search,
+    bookingDate,
+    fieldFilter,
+    paymentStatus,
+    offset,
+    onSessionExpired,
+  ]);
 
   const fetchBookings = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_bookings`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-          "Content-Type": "application/json",
+      const res = await authFetch(
+        `${BASE_URL}/rest/v1/rpc/get_bookings`,
+        {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_limit: limit,
+            p_offset: offset,
+            p_booking_date: bookingDate || null,
+            p_field_name: fieldFilter || null,
+            p_payment_status: paymentStatus || null,
+            p_search: search || null,
+          }),
         },
-        body: JSON.stringify({
-          p_limit: limit,
-          p_offset: offset,
-          p_booking_date: bookingDate || null,
-          p_field_name: fieldFilter || null,
-          p_payment_status: paymentStatus || null,
-          p_search: search || null,
-        }),
-      });
+        onSessionExpired,
+      );
 
       const data: ApiItem[] = await res.json();
 
@@ -92,17 +109,18 @@ export function BookingsPage() {
   const fetchBookingDetails = async (code: string) => {
     try {
       setDetailsLoading(true);
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_booking_details`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-          "Content-Type": "application/json",
+      const res = await authFetch(
+        `${BASE_URL}/rest/v1/rpc/get_booking_details`,
+        {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ p_booking_code: code }),
         },
-        body: JSON.stringify({ p_booking_code: code }),
-      });
+        onSessionExpired,
+      );
       const data = await res.json();
       setDetails(data);
       return data;
@@ -117,23 +135,23 @@ export function BookingsPage() {
   const handleEdit = async (booking: Booking) => {
     console.log("🔧 handleEdit called");
 
-    // Close the view drawer
     setSelectedBooking(null);
     setDetails(null);
-
     setEditDetailsLoading(true);
 
-    // Fetch details WITHOUT setting the details state
     try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_booking_details`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
-          "Content-Type": "application/json",
+      const res = await authFetch(
+        `${BASE_URL}/rest/v1/rpc/get_booking_details`,
+        {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ p_booking_code: booking.bookingCode }),
         },
-        body: JSON.stringify({ p_booking_code: booking.bookingCode }),
-      });
+        onSessionExpired,
+      );
       const fullDetails = await res.json();
       console.log("📦 Full details:", fullDetails);
 
@@ -169,16 +187,19 @@ export function BookingsPage() {
 
       console.log("Request payload:", JSON.stringify(requestBody, null, 2));
 
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/update_booking`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
+      const res = await authFetch(
+        `${BASE_URL}/rest/v1/rpc/update_booking`,
+        {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(requestBody),
         },
-        body: JSON.stringify(requestBody),
-      });
+        onSessionExpired,
+      );
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -201,7 +222,7 @@ export function BookingsPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-semibold">Bookings Management</h1>
         <button
-          onClick={() => setShowBookingPopup(true)} // CHANGE THIS
+          onClick={() => setShowBookingPopup(true)}
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg transition-transform active:scale-95"
         >
           <Plus className="w-5 h-5" /> Add Booking
@@ -232,7 +253,7 @@ export function BookingsPage() {
           onClose={() => {
             setShowBookingPopup(false);
             toast.success("Booking created successfully!");
-            fetchBookings(); // Refresh bookings list
+            fetchBookings();
           }}
         />
 
@@ -243,7 +264,7 @@ export function BookingsPage() {
             setSelectedBooking(b);
             fetchBookingDetails(b.bookingCode);
           }}
-          onEdit={handleEdit} // Make sure this is handleEdit, not (b) => setEditingBooking(b)
+          onEdit={handleEdit}
         />
 
         {editingBooking && (
