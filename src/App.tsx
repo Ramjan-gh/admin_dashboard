@@ -16,7 +16,6 @@ import { SettingsPage } from "./components/SettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { Toaster } from "sonner";
 import {
-  getAccessToken,
   getRefreshToken,
   clearSession,
   refreshSession,
@@ -29,24 +28,30 @@ export default function App() {
 
   useEffect(() => {
     async function checkAuth() {
-      if (getAccessToken()) {
-        // Access token present — treat as authenticated.
-        // authFetch() will silently refresh on the first 401.
-        setIsAuthenticated(true);
-        return;
-      }
       if (getRefreshToken()) {
-        // No access token but refresh token exists → try a silent refresh now.
+        // Always refresh on page load — don't trust the stored access token
+        // It may have expired while the tab was closed
         const ok = await refreshSession();
         setIsAuthenticated(ok);
         return;
       }
-      // Nothing stored — send to login.
       setIsAuthenticated(false);
     }
-
     checkAuth();
   }, []);
+
+  // Proactive refresh — runs every 50 minutes while the app is open
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const interval = setInterval(
+      async () => {
+        const ok = await refreshSession();
+        if (!ok) handleSessionExpired();
+      },
+      50 * 60 * 1000,
+    ); // 50 minutes
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   // Explicit logout from Sidebar / TopBar
   const handleLogout = () => {
