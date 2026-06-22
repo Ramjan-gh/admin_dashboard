@@ -13,7 +13,7 @@ import {
 import { RevenueTrendChart } from "./RevenueTrendChart";
 import { RevenueDistributionPie } from "./RevenueDistributionPie";
 import { AnalyticsContent } from "./AnalyticsContent";
-import { authFetch } from "./Authutils";
+import { authFetch } from "./authutils";
 
 const calculateWeeksBetween = (start: string, end: string): number => {
   const d1 = new Date(start);
