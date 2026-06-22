@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Slot, Shift, Field } from "../types";
-import { authFetch } from ".././Authutils";
+import { authFetch } from ".././authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
