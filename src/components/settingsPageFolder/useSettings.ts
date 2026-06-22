@@ -6,9 +6,9 @@ import { authFetch } from ".././authutils";
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 const TIERS_TABLE_URL = `${BASE_URL}/rest/v1/membership_tiers`;
 
-const ORG_TABLE_URL = `${BASE_URL}/rest/v1/organizations`;
+const ORG_TABLE_URL = `${BASE_URL}/rest/v1/rpc/get_organization`;
 const SCHEDULE_TABLE_URL = `${BASE_URL}/rest/v1/business_schedule`;
-const DISCOUNTS_TABLE_URL = `${BASE_URL}/rest/v1/discounts`;
+const DISCOUNTS_TABLE_URL = `${BASE_URL}/rest/v1/rpc/get_discount_codes`;
 const MEDIA_TABLE_URL = `${BASE_URL}/rest/v1/media`; // Added for custom banner bypassing
 
 // --- Interfaces ---
@@ -189,7 +189,7 @@ export function useSettings(onSessionExpired: () => void) {
         authFetch(`${DISCOUNTS_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
       ]);
 
-      if (orgRes?.[0]) setOrgData(orgRes[0]);
+      if (orgRes) setOrgData(orgRes);
       if (Array.isArray(scheduleRes)) setHolidays(scheduleRes);
       if (Array.isArray(discountRes)) setDiscounts(discountRes);
 
@@ -516,7 +516,6 @@ export function useSettings(onSessionExpired: () => void) {
       if (!dbRes.ok) throw new Error("Failed to delete record from database.");
 
       setGallery((prev) => prev.filter((g) => g.id !== item.id));
-
       const filePath = item.file_url.split("/public/media/")[1];
       if (filePath) await storageDelete(filePath);
 
