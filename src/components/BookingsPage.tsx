@@ -8,7 +8,7 @@ import { BookingDetailsDrawer } from "./bookingsPageFolder/BookingDetailsDrawer"
 import { UpdateBookingModal } from "./bookingsPageFolder/UpdateBookingModal";
 import { BookingPopup } from "./bookingsPageFolder/BookingPopup";
 import { toast } from "sonner";
-import { authFetch } from "./Authutils";
+import { authFetch } from "./authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
