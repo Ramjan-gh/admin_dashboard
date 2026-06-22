@@ -1,9 +1,18 @@
-import { Building, Calendar, Tag, AlertCircle, Loader2, Images } from "lucide-react";
+import {
+  Building,
+  Calendar,
+  Tag,
+  AlertCircle,
+  Loader2,
+  Images,
+  Award,
+} from "lucide-react";
 import { GeneralSettings } from "./settingsPageFolder/generalSettingsFolder/GeneralSettings";
 import { HolidaySettings } from "./settingsPageFolder/HolidaySettings";
 import { DiscountSettings } from "./settingsPageFolder/discountSettingsFolder/DiscountSettings";
-import { useSettings } from "./settingsPageFolder/useSettings"; 
 import { GallerySettings } from "./settingsPageFolder/generalSettingsFolder/GallerySettings";
+import { PointsAndTiersSettings } from "./settingsPageFolder/pointsAndTiersSettingsFolder/PointsAndTiersSettings";
+import { useSettings } from "./settingsPageFolder/useSettings";
 
 type Props = {
   onSessionExpired: () => void;
@@ -39,6 +48,12 @@ export function SettingsPage({ onSessionExpired }: Props) {
     handleGalleryUpload,
     handleDeleteGalleryItem,
     setHasChanges,
+    // New Tier management states and actions from useSettings custom hook
+    tiers,
+    tiersLoading,
+    handleCreateTier,
+    handleUpdateTier,
+    handleDeleteTier,
   } = useSettings(onSessionExpired);
 
   if (loading)
@@ -52,6 +67,7 @@ export function SettingsPage({ onSessionExpired }: Props) {
     { id: "general", label: "General", icon: Building },
     { id: "holidays", label: "Holidays", icon: Calendar },
     { id: "discounts", label: "Discounts", icon: Tag },
+    { id: "tiers", label: "Points & Tiers", icon: Award },
     { id: "gallery", label: "Gallery", icon: Images },
   ];
 
@@ -125,6 +141,16 @@ export function SettingsPage({ onSessionExpired }: Props) {
               handleAddDiscount={handleAddDiscount}
               handleDeleteDiscount={handleDeleteDiscount}
               handleToggleDiscountStatus={handleToggleDiscountStatus}
+            />
+          )}
+
+          {activeTab === "tiers" && (
+            <PointsAndTiersSettings
+              tiers={tiers}
+              loading={tiersLoading}
+              onCreateTier={handleCreateTier}
+              onUpdateTier={handleUpdateTier}
+              onDeleteTier={handleDeleteTier}
             />
           )}
 

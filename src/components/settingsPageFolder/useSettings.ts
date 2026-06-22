@@ -1,9 +1,15 @@
 import { useState, useEffect, useCallback, ChangeEvent } from "react";
 import { toast } from "sonner";
 import { Organization, Holiday, Discount } from "../types";
-import { authFetch } from ".././Authutils";
+import { authFetch } from ".././authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
+const TIERS_TABLE_URL = `${BASE_URL}/rest/v1/membership_tiers`;
+
+const ORG_TABLE_URL = `${BASE_URL}/rest/v1/organizations`;
+const SCHEDULE_TABLE_URL = `${BASE_URL}/rest/v1/business_schedule`;
+const DISCOUNTS_TABLE_URL = `${BASE_URL}/rest/v1/discounts`;
+const MEDIA_TABLE_URL = `${BASE_URL}/rest/v1/media`; // Added for custom banner bypassing
 
 // --- Interfaces ---
 
@@ -25,13 +31,24 @@ interface NewDiscountState {
   p_is_active: boolean;
 }
 
+export type MembershipTier = {
+  id: string;
+  name: string;
+  min_points: number;
+  discount_percentage: number;
+  points_multiplier: number;
+  badge_color: string;
+  description: string;
+  reward_interval: number | null;
+};
+
 interface ApiResponse {
   success: boolean;
   message: string;
 }
 
 interface MediaItem {
-  id: any;
+  id: string | number;
   file_url: string;
   media_type: string;
 }
@@ -44,12 +61,14 @@ export function useSettings(onSessionExpired: () => void) {
   const [loading, setLoading] = useState(true);
   const [bannerLoading, setBannerLoading] = useState(false);
   const [galleryLoading, setGalleryLoading] = useState(false);
+  const [tiersLoading, setTiersLoading] = useState(false);
   const [gallery, setGallery] = useState<MediaItem[]>([]);
 
   const [orgData, setOrgData] = useState<Organization | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [banners, setBanners] = useState<MediaItem[]>([]);
+  const [tiers, setTiers] = useState<MembershipTier[]>([]);
 
   const initialHoliday: NewHolidayState = { p_date: "", p_is_open: false, p_notes: "" };
   const initialDiscount: NewDiscountState = {
@@ -92,14 +111,19 @@ export function useSettings(onSessionExpired: () => void) {
 
   // --- Fetchers ---
 
+  // Bypassed RPC logic for Banners
   const fetchBanners = useCallback(async () => {
     try {
-      const res = await rpc("get_banners");
+      const res = await authFetch(
+        `${MEDIA_TABLE_URL}?use_case=eq.banner&select=id,file_url,media_type&order=created_at.desc`,
+        { method: "GET", headers: getBaseHeaders() },
+        onSessionExpired,
+      );
       if (res.ok) setBanners(await res.json());
     } catch (err) {
       console.error("Error fetching banners:", err);
     }
-  }, [rpc]);
+  }, [getBaseHeaders, onSessionExpired]);
 
   const fetchGallery = useCallback(async () => {
     try {
@@ -114,26 +138,72 @@ export function useSettings(onSessionExpired: () => void) {
     }
   }, [getBaseHeaders, onSessionExpired]);
 
+  const fetchMembershipTiers = useCallback(async () => {
+    try {
+      // 1. Strip out ALL order query parameters from the network layer completely. 
+      // This strips the sorting command away from PostgREST so it cannot throw a 400 error.
+      const res = await authFetch(
+        `${BASE_URL}/rest/v1/membership_tiers?select=*`, 
+        { 
+          method: "GET", 
+          headers: getBaseHeaders() 
+        },
+        onSessionExpired
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+        
+        const mappedData = Array.isArray(data) ? data.map((tier: any) => ({
+          id: tier.id ?? tier.p_id,
+          name: tier.name ?? tier.p_name,
+          min_points: Number(tier.min_points ?? tier.p_min_points ?? 0),
+          discount_percentage: Number(tier.discount_percentage ?? tier.p_discount_percentage ?? 0),
+          points_multiplier: Number(tier.points_multiplier ?? tier.p_points_multiplier ?? 1),
+          badge_color: tier.badge_color ?? tier.p_badge_color ?? "#6B46C1",
+          description: tier.description ?? tier.p_description ?? "",
+          reward_interval: tier.reward_interval !== undefined ? tier.reward_interval : (tier.p_reward_interval ?? null),
+        })) : [];
+
+        // 2. Perform a safe client-side fallback sort directly on the mapped array values
+        const safelySortedData = mappedData.sort((a, b) => a.min_points - b.min_points);
+
+        setTiers(safelySortedData);
+      } else {
+        const errLog = await res.json().catch(() => null);
+        console.error("Supabase direct query rejection payload:", errLog);
+      }
+    } catch (err) {
+      console.error("Error fetching membership tiers:", err);
+    }
+  }, [getBaseHeaders, onSessionExpired]);
+  
+
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
+      // Complete RPC bypass architecture
       const [orgRes, scheduleRes, discountRes] = await Promise.all([
-        rpc("get_organization").then((r) => r.json()),
-        rpc("get_business_schedule").then((r) => r.json()),
-        rpc("get_discount_codes").then((r) => r.json()),
+        authFetch(`${ORG_TABLE_URL}?select=*&limit=1`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
+        authFetch(`${SCHEDULE_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
+        authFetch(`${DISCOUNTS_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
       ]);
 
       if (orgRes?.[0]) setOrgData(orgRes[0]);
       if (Array.isArray(scheduleRes)) setHolidays(scheduleRes);
       if (Array.isArray(discountRes)) setDiscounts(discountRes);
-      await fetchBanners();
-      await fetchGallery();
+
+      await Promise.all([
+        fetchBanners(),
+        fetchGallery(),
+        fetchMembershipTiers()
+      ]);
     } catch (error) {
-      console.error("Error fetching settings:", error);
+      console.error("Error fetching settings via raw tables:", error);
     } finally {
       setLoading(false);
     }
-  }, [rpc, fetchBanners, fetchGallery]);
+  }, [getBaseHeaders, onSessionExpired, fetchBanners, fetchGallery, fetchMembershipTiers]);
 
   useEffect(() => { fetchAllData(); }, [fetchAllData]);
 
@@ -251,6 +321,106 @@ export function useSettings(onSessionExpired: () => void) {
     }
   };
 
+  // --- Points & Tiers Actions ---
+
+  const handleCreateTier = async (tier: Omit<MembershipTier, "id">) => {
+    setTiersLoading(true);
+    try {
+      const dbPayload = {
+        name: tier.name || "New Tier",
+        min_points: Number(tier.min_points ?? 0) || 0,
+        discount_percentage: Number(tier.discount_percentage ?? 0) || 0,
+        points_multiplier: Number(tier.points_multiplier ?? 1) || 1,
+        badge_color: tier.badge_color || "#6B46C1",
+        description: tier.description || "",
+        reward_interval: tier.reward_interval,
+      };
+
+      const headers = {
+        ...getBaseHeaders(),
+        "Prefer": "return=representation",
+      };
+
+      const res = await authFetch(
+        TIERS_TABLE_URL,
+        {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(dbPayload),
+        },
+        onSessionExpired
+      );
+      
+      if (res.ok) {
+        toast.success("Membership tier created successfully!");
+        await fetchMembershipTiers();
+      } else {
+        const errorJson = await res.json().catch(() => null);
+        console.error("🔴 SUPABASE REJECTION REASON:", errorJson);
+        toast.error(`Failed to build tier: ${errorJson?.message || "Invalid Data Structure"}`);
+      }
+    } catch (error) {
+      console.error("Network Error:", error);
+      toast.error("Network interface breakdown during creation.");
+    } finally {
+      setTiersLoading(false);
+    }
+  };
+
+  const handleUpdateTier = async (id: string, updates: Partial<MembershipTier>) => {
+    setTiersLoading(true);
+    try {
+      const dbPayload = {
+        discount_percentage: updates.discount_percentage,
+        points_multiplier: updates.points_multiplier,
+      };
+
+      const res = await authFetch(
+        `${TIERS_TABLE_URL}?id=eq.${id}`,
+        {
+          method: "PATCH",
+          headers: getBaseHeaders(),
+          body: JSON.stringify(dbPayload),
+        },
+        onSessionExpired
+      );
+      if (res.ok) {
+        toast.success("Membership tier updated successfully!");
+        await fetchMembershipTiers();
+      } else {
+        toast.error("Failed to adjust tier updates.");
+      }
+    } catch {
+      toast.error("Network interface error occurred during modification.");
+    } finally {
+      setTiersLoading(false);
+    }
+  };
+
+  const handleDeleteTier = async (id: string) => {
+    setTiersLoading(true);
+    try {
+      const res = await authFetch(
+        `${TIERS_TABLE_URL}?id=eq.${id}`,
+        {
+          method: "DELETE",
+          headers: getBaseHeaders(),
+        },
+        onSessionExpired
+      );
+      if (res.ok) {
+        toast.success("Membership tier cleared away successfully.");
+        await fetchMembershipTiers();
+      } else {
+        toast.error("Failed to erase tier.");
+      }
+    } catch {
+      toast.error("Network processing failure while deleting.");
+    } finally {
+      setTiersLoading(false);
+    }
+  };
+
   // --- Media Uploads ---
 
   const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -363,5 +533,6 @@ export function useSettings(onSessionExpired: () => void) {
     handleAddDiscount, handleDeleteDiscount, handleToggleDiscountStatus, handleLogoUpload,
     handleBannerUpload, handleDeleteBanner, gallery, galleryLoading,
     handleGalleryUpload, handleDeleteGalleryItem,
+    tiers, tiersLoading, handleCreateTier, handleUpdateTier, handleDeleteTier
   };
 }
