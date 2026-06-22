@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { DropResult } from "@hello-pangea/dnd";
 import { toast } from "sonner";
-import { authFetch } from ".././Authutils";
+import { authFetch } from ".././authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
