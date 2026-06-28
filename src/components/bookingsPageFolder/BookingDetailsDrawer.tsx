@@ -26,6 +26,21 @@ export function BookingDetailsDrawer({
     details?.booking?.is_cancelled ||
     details?.booking?.payment_status === "cancelled";
 
+  // Dynamic values safe-guards
+  const finalAmount = details?.booking?.final_amount ?? 0;
+  const rawPaidAmount = details?.booking?.paid_amount ?? 0;
+  
+  // FIX: If raw paid amount exceeds final amount (due to discounts/loyalty points), 
+  // cap the effective paid amount to the final bill total.
+  const paidAmount = rawPaidAmount > finalAmount ? finalAmount : rawPaidAmount;
+  
+  // Calculate if an overpayment/excess adjustment scenario is present
+  const isOverpaid = rawPaidAmount > finalAmount;
+  const overpaidDifference = rawPaidAmount - finalAmount;
+
+  // Rule: Balance due safely hits 0 instead of dipping into a negative range
+  const balanceDue = Math.max(0, finalAmount - paidAmount);
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-[100]">
       <div className="absolute inset-0" onClick={onClose}></div>
@@ -268,7 +283,7 @@ export function BookingDetailsDrawer({
                       </div>
                     )}
 
-                    {/* NEW LOYALTY POINTS REDEEMED SECTION */}
+                    {/* Loyalty Points Redeemed Section */}
                     {(details?.booking?.point_redeem_amount ?? 0) > 0 && (
                       <div className="p-4 flex justify-between items-center text-sm bg-amber-50/40">
                         <div className="flex items-center gap-2">
@@ -305,19 +320,22 @@ export function BookingDetailsDrawer({
                             : "text-purple-700"
                         }
                       >
-                        ৳{details?.booking?.final_amount ?? 0}
+                        ৳{finalAmount}
                       </span>
                     </div>
 
                     {/* Paid Amount */}
-                    <div className="p-4 flex justify-between text-sm bg-green-50/60">
-                      <span className="text-gray-700 font-medium uppercase text-[10px]">
-                        Amount Paid
-                      </span>
+                    <div className="p-4 flex justify-between items-center text-sm bg-green-50/60">
+                      <div className="flex flex-col">
+                        <span className="text-gray-700 font-medium uppercase text-[10px]">
+                          Amount Paid
+                        </span>
+                        
+                      </div>
                       <span
                         className={`font-bold ${isCancelled ? "text-gray-400" : "text-green-700"}`}
                       >
-                        ৳{details?.booking?.paid_amount ?? 0}
+                        ৳{paidAmount}
                       </span>
                     </div>
 
@@ -331,9 +349,7 @@ export function BookingDetailsDrawer({
                           isCancelled ? "text-gray-400" : "text-red-700"
                         }
                       >
-                        ৳
-                        {(details?.booking?.final_amount ?? 0) -
-                          (details?.booking?.paid_amount ?? 0)}
+                        ৳ {balanceDue}
                       </span>
                     </div>
                   </div>
@@ -386,9 +402,7 @@ export function BookingDetailsDrawer({
                       Balance Remaining
                     </p>
                     <p className="text-xl font-black text-red-600">
-                      ৳{" "}
-                      {(details?.booking?.final_amount ?? 0) -
-                        (details?.booking?.paid_amount ?? 0)}
+                      ৳ {balanceDue}
                     </p>
                   </div>
                 )}
