@@ -61,6 +61,8 @@ export type BookingDetails = {
     discount_code: string;
     number_of_players: number;
     is_cancelled: boolean;
+    // ➕ ADDED: Optional property matching your Supabase/API payload structure
+    point_redeem_amount?: number; 
   };
   discount_code: string;
 };
@@ -99,6 +101,7 @@ export interface Organization {
   instagram_url: string;
   tiktok_url: string;
   whatsapp_url: string;
+  points_exchange_rate: number; 
 }
 
 export interface Holiday {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Edit2, Loader2, Award, Info } from "lucide-react";
+import { Plus, Trash2, Edit2, Loader2, Award, Info, Coins, Save } from "lucide-react";
 
 export type MembershipTier = {
   id: string;
@@ -18,6 +18,10 @@ type PointsAndTiersSettingsProps = {
   onCreateTier: (tier: Omit<MembershipTier, "id">) => Promise<void>;
   onUpdateTier: (id: string, updates: Partial<MembershipTier>) => Promise<void>;
   onDeleteTier: (id: string) => Promise<void>;
+  
+  // ➕ Added Organization State Parameters for global exchange rate mapping
+  pointExchangeRate: number;
+  onUpdateExchangeRate: (rate: number) => Promise<void>;
 };
 
 export function PointsAndTiersSettings({
@@ -26,10 +30,16 @@ export function PointsAndTiersSettings({
   onCreateTier,
   onUpdateTier,
   onDeleteTier,
+  pointExchangeRate = 0,
+  onUpdateExchangeRate,
 }: PointsAndTiersSettingsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<MembershipTier | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [exchangeRateLoading, setExchangeRateLoading] = useState(false);
+
+  // Exchange rate local component state
+  const [localExchangeRate, setLocalExchangeRate] = useState<string>(pointExchangeRate.toString());
 
   // Form states
   const [name, setName] = useState("");
@@ -63,6 +73,18 @@ export function PointsAndTiersSettings({
     setDescription(tier.description || "");
     setRewardInterval(tier.reward_interval ?? 30);
     setIsModalOpen(true);
+  };
+
+  const handleExchangeRateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExchangeRateLoading(true);
+    try {
+      await onUpdateExchangeRate(Number(localExchangeRate || 0));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setExchangeRateLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,6 +139,61 @@ export function PointsAndTiersSettings({
 
   return (
     <div className="space-y-6">
+      {/* ➕ POINT EXCHANGE RATE CONFIGURATION CARD */}
+      <div className="bg-white p-5 border border-gray-200 rounded-xl shadow-sm">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+            <Coins className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Point Conversion Setup</h3>
+            <p className="text-xs text-gray-500">
+              Define monetary value calculations when customers redeem accumulated reward tokens at point of checkout.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleExchangeRateSubmit} className="flex flex-col sm:flex-row gap-3 items-end max-w-xl">
+          <div className="w-full sm:w-auto flex-1">
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              1 Loyalty Point Value = 
+            </label>
+            <div className="relative rounded-lg shadow-xs">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <span className="text-gray-400 text-sm">৳</span>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={localExchangeRate}
+                onChange={(e) => setLocalExchangeRate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:border-purple-500 focus:ring-purple-500 outline-none"
+                placeholder="e.g. 0.10"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={exchangeRateLoading}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:bg-gray-400 h-[38px]"
+          >
+            {exchangeRateLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            Save Configuration
+          </button>
+        </form>
+        <p className="text-[11px] text-gray-400 mt-2">
+          💡 Current Rule: {(Number(localExchangeRate))} points will deduct <span className="font-semibold text-gray-600">৳1</span> total from fields booking summary bills.
+        </p>
+      </div>
+
+      <hr className="border-gray-100" />
+
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
@@ -143,19 +220,16 @@ export function PointsAndTiersSettings({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tiers.map((rawTier, index) => {
-            // Defensive runtime check to completely prevent .toLocaleString crashes
             if (!rawTier) {
               console.warn(`Tier at index ${index} is null or undefined.`);
               return null;
             }
 
-            // Fallback parsing engine
             const tierId = rawTier.id || `fallback-id-${index}`;
             const tierName = rawTier.name || "Unnamed Tier";
             const badgeColorTheme = rawTier.badge_color || "#6B46C1";
             const tierDescription = rawTier.description || "No description provided.";
             
-            // Explicit type casting logic to guarantee number presence
             const pointsNeeded = typeof rawTier.min_points === "number" 
               ? rawTier.min_points 
               : Number(rawTier.min_points || 0);
@@ -168,7 +242,6 @@ export function PointsAndTiersSettings({
               ? rawTier.points_multiplier
               : Number(rawTier.points_multiplier || 1);
 
-            // Log misaligned payload shapes to console so you can inspect them
             if (rawTier.min_points === undefined) {
               console.error("CRITICAL: Received a tier object missing 'min_points':", rawTier);
             }

@@ -5,6 +5,7 @@ import {
   Calendar,
   CreditCard,
   Tag,
+  Coins, // Added for loyalty points visual representation
   FileText,
   Ban,
   AlertTriangle,
@@ -249,6 +250,8 @@ export function BookingDetailsDrawer({
                         ৳{details?.booking?.total_amount ?? 0}
                       </span>
                     </div>
+                    
+                    {/* Coupon Promo Discount Row */}
                     {(details?.booking?.discount_amount ?? 0) > 0 && (
                       <div className="p-4 flex justify-between items-center text-sm bg-red-50/50">
                         <div className="flex items-center gap-2">
@@ -264,6 +267,24 @@ export function BookingDetailsDrawer({
                         </span>
                       </div>
                     )}
+
+                    {/* NEW LOYALTY POINTS REDEEMED SECTION */}
+                    {(details?.booking?.point_redeem_amount ?? 0) > 0 && (
+                      <div className="p-4 flex justify-between items-center text-sm bg-amber-50/40">
+                        <div className="flex items-center gap-2">
+                          <Coins className="w-3 h-3 text-amber-600" />
+                          <span className="text-amber-700 font-medium uppercase text-[10px]">
+                            Loyalty Points Deducted
+                          </span>
+                        </div>
+                        <span
+                          className={`font-bold text-amber-700 ${isCancelled ? "line-through" : ""}`}
+                        >
+                          - ৳{details?.booking?.point_redeem_amount}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="p-4 flex justify-between text-sm">
                       <span className="text-gray-500 font-medium uppercase text-[10px]">
                         Payment Method
@@ -272,8 +293,9 @@ export function BookingDetailsDrawer({
                         {details?.booking?.payment_method ?? "N/A"}
                       </span>
                     </div>
+                    
                     <div
-                      className={`p-4 flex justify-between text-base font-black ${isCancelled ? "bg-gray-50" : "bg-gray-50"}`}
+                      className={`p-4 flex justify-between text-base font-black bg-gray-50`}
                     >
                       <span className="text-gray-900">Final Total</span>
                       <span
@@ -287,8 +309,8 @@ export function BookingDetailsDrawer({
                       </span>
                     </div>
 
-                    {/* ADD THIS SECTION - Paid Amount */}
-                    <div className="p-4 flex justify-between text-sm bg-green-50">
+                    {/* Paid Amount */}
+                    <div className="p-4 flex justify-between text-sm bg-green-50/60">
                       <span className="text-gray-700 font-medium uppercase text-[10px]">
                         Amount Paid
                       </span>
@@ -316,6 +338,7 @@ export function BookingDetailsDrawer({
                     </div>
                   </div>
                 </div>
+                
                 {/* Special Notes */}
                 {details?.booking?.special_notes && (
                   <div className="space-y-2">
@@ -356,7 +379,7 @@ export function BookingDetailsDrawer({
               </div>
 
               {/* Sticky Action Footer */}
-              <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-6 border-t mt-auto">
+              <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-6 border-t mt-auto z-10">
                 {!isCancelled && (
                   <div className="flex justify-between items-center mb-4">
                     <p className="text-xs text-gray-500 font-bold uppercase">

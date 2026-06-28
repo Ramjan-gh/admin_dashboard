@@ -24,6 +24,7 @@ type Organization = {
   instagram_url?: string | null;
   tiktok_url?: string | null;
   whatsapp_url?: string | null;
+  points_exchange_rate?: number;
 };
 
 const Footer: React.FC = () => {

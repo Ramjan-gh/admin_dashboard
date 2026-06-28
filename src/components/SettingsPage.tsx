@@ -13,6 +13,7 @@ import { DiscountSettings } from "./settingsPageFolder/discountSettingsFolder/Di
 import { GallerySettings } from "./settingsPageFolder/generalSettingsFolder/GallerySettings";
 import { PointsAndTiersSettings } from "./settingsPageFolder/pointsAndTiersSettingsFolder/PointsAndTiersSettings";
 import { useSettings } from "./settingsPageFolder/useSettings";
+import { Organization } from "./types";
 
 type Props = {
   onSessionExpired: () => void;
@@ -94,11 +95,10 @@ export function SettingsPage({ onSessionExpired }: Props) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 whitespace-nowrap font-medium transition-all ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-6 py-4 whitespace-nowrap font-medium transition-all ${activeTab === tab.id
                     ? "border-b-2 border-purple-500 text-purple-600 bg-white"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 <tab.icon className="w-5 h-5" />
                 <span>{tab.label}</span>
@@ -151,6 +151,20 @@ export function SettingsPage({ onSessionExpired }: Props) {
               onCreateTier={handleCreateTier}
               onUpdateTier={handleUpdateTier}
               onDeleteTier={handleDeleteTier}
+              pointExchangeRate={orgData?.points_exchange_rate ?? 0}
+              onUpdateExchangeRate={async (newRate: number) => {
+                if (!orgData) return;
+
+                // 💥 Fix: Explicitly cast the object to 'Organization' to stop the literal check error
+                setOrgData({
+                  ...orgData,
+                  point_exchange_rate: newRate,
+                } as Organization);
+
+                setTimeout(() => {
+                  handleUpdateOrg();
+                }, 50);
+              }}
             />
           )}
 

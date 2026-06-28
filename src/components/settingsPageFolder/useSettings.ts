@@ -224,6 +224,7 @@ export function useSettings(onSessionExpired: () => void) {
         p_instagram_url: orgData.instagram_url,
         p_tiktok_url: orgData.tiktok_url,
         p_whatsapp_url: orgData.whatsapp_url,
+        p_points_exchange_rate: orgData.points_exchange_rate,
       });
       if (response.ok) {
         setHasChanges(false);
