@@ -90,6 +90,7 @@ export type ApiItem = {
 // SeetingsPage.tsx types
 
 export interface Organization {
+  id: number;
   name: string;
   description: string;
   logo_url: string;

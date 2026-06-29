@@ -36,6 +36,7 @@ export function SettingsPage({ onSessionExpired }: Props) {
     banners,
     bannerLoading,
     handleUpdateOrg,
+    handleUpdateExchangeRate,
     handleAddSchedule,
     handleDeleteSchedule,
     handleAddDiscount,
@@ -152,19 +153,7 @@ export function SettingsPage({ onSessionExpired }: Props) {
               onUpdateTier={handleUpdateTier}
               onDeleteTier={handleDeleteTier}
               pointExchangeRate={orgData?.points_exchange_rate ?? 0}
-              onUpdateExchangeRate={async (newRate: number) => {
-                if (!orgData) return;
-
-                // 💥 Fix: Explicitly cast the object to 'Organization' to stop the literal check error
-                setOrgData({
-                  ...orgData,
-                  point_exchange_rate: newRate,
-                } as Organization);
-
-                setTimeout(() => {
-                  handleUpdateOrg();
-                }, 50);
-              }}
+              onUpdateExchangeRate={handleUpdateExchangeRate} 
             />
           )}
 

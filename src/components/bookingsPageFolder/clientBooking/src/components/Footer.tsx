@@ -11,7 +11,7 @@ import {
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 // Updated type definition to match your new API response
-type Organization = {
+export type Organization = {
   id: number;
   name: string;
   description: string;
