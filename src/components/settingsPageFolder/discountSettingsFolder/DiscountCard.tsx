@@ -81,7 +81,7 @@ export function DiscountCard({
             </span>
             <button
               onClick={() => copyToClipboard(d.code, d.id)}
-              className="text-gray-300 hover:text-purple-500"
+              className="text-gray-300 hover:text-blue-500"
             >
               {copiedId === d.id ? (
                 <Check className="w-3 h-3 text-green-500" />

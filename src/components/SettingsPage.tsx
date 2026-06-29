@@ -96,7 +96,7 @@ export function SettingsPage({ onSessionExpired }: Props) {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-6 py-4 whitespace-nowrap font-medium transition-all ${activeTab === tab.id
-                    ? "border-b-2 border-purple-500 text-purple-600 bg-white"
+                    ? "border-b-2 border-blue-500 text-purple-600 bg-white"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                   }`}
               >

@@ -223,7 +223,7 @@ export function BookingsPage({ onSessionExpired }: Props) {
         <h1 className="text-xl font-semibold">Bookings Management</h1>
         <button
           onClick={() => setShowBookingPopup(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg transition-transform active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-500 text-white rounded-lg transition-transform active:scale-95"
         >
           <Plus className="w-5 h-5" /> Add Booking
         </button>

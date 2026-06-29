@@ -169,7 +169,7 @@ export function PointsAndTiersSettings({
                 required
                 value={localExchangeRate}
                 onChange={(e) => setLocalExchangeRate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:border-purple-500 focus:ring-purple-500 outline-none"
+                className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500 outline-none"
                 placeholder="e.g. 0.10"
               />
             </div>

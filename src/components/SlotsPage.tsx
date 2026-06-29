@@ -58,7 +58,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
       case "available":
         return "border-green-300 bg-green-50 hover:bg-green-100";
       case "booked":
-        return "border-purple-300 bg-purple-50";
+        return "border-orange-300 bg-orange-50";
       case "maintenance":
         return "border-red-300 bg-red-50";
       default:
@@ -106,7 +106,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
         </div>
         <button
           onClick={() => setAddShiftModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg active:scale-95"
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-500 text-white rounded-lg active:scale-95"
         >
           <Plus className="w-5 h-5" />
           <span className="font-medium">Add New Shift</span>

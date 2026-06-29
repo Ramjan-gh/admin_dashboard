@@ -6,7 +6,7 @@ export const getStatusColor = (status: string) => {
   switch (status) {
     case "paid":
     case "fully_paid":
-      return "bg-green-100 text-green-700";
+      return "bg-blue-100 text-blue-700";
     case "partially_paid":
       return "bg-orange-100 text-orange-700";
     case "cancelled":
@@ -96,7 +96,7 @@ export function BookingsTable({
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-purple-600 tracking-wider">
+                      <span className="font-bold text-blue-500 tracking-wider">
                         {b.bookingCode}
                       </span>
                       {isCancelled && (
@@ -193,7 +193,7 @@ export function BookingsTable({
                         }}
                         className={`p-2 rounded-lg transition-all ${
                           isEditable
-                            ? "bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white"
+                            ? "bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
                             : "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
                         }`}
                         title={

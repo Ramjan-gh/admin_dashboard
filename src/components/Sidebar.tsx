@@ -53,7 +53,7 @@ export function Sidebar({
           {/* Logo Section */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center">
                 <span className="text-white font-bold">TB</span>
               </div>
               <div>
@@ -83,7 +83,7 @@ export function Sidebar({
                     transition-all duration-200
                     ${
                       isActive
-                        ? "bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white shadow-md"
+                        ? "bg-blue-500 text-white shadow-md"
                         : "text-gray-700 hover:bg-gray-100"
                     }
                   `}

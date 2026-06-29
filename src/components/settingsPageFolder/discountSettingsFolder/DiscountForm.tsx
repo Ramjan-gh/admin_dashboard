@@ -9,7 +9,7 @@ export function DiscountForm({
 }: any) {
   return (
     <div
-      className={`bg-white p-6 rounded-2xl border shadow-sm ring-1 transition-all duration-500 ${newDiscount.id ? "border-purple-500 ring-purple-100" : "border-purple-100 ring-purple-50"}`}
+      className={`bg-white p-6 rounded-2xl border shadow-sm ring-1 transition-all duration-500 ${newDiscount.id ? "border-blue-500 ring-purple-100" : "border-purple-100 ring-purple-50"}`}
     >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">

@@ -62,7 +62,7 @@ export function BookingConfirmation() {
         Booking Successful
       </h1>
 
-      <div className="bg-white shadow-2xl shadow-purple-500/30 rounded-lg w-full md:w-auto no-scrollbar print-area print:shadow-none">
+      <div className="bg-white shadow-2xl shadow-blue-500/30 rounded-lg w-full md:w-auto no-scrollbar print-area print:shadow-none">
         <div className="p-8 print:p-12">
           {/* Success Header */}
           <div className="text-center mb-6 print:mb-0 print:hidden">

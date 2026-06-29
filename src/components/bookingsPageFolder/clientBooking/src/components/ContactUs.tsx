@@ -38,7 +38,7 @@ export function ContactUs() {
       icon: Mail,
       title: 'Email',
       details: 'info@turfbook.com',
-      color: 'from-purple-500 to-pink-600'
+      color: 'from-blue-500 to-pink-600'
     },
     {
       icon: MapPin,
@@ -138,7 +138,7 @@ export function ContactUs() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="border-2 focus:border-purple-500"
+                className="border-2 focus:border-blue-500"
               />
             </div>
 
@@ -151,7 +151,7 @@ export function ContactUs() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="border-2 focus:border-purple-500"
+                className="border-2 focus:border-blue-500"
               />
             </div>
 
@@ -163,7 +163,7 @@ export function ContactUs() {
                 placeholder="01XXXXXXXXX"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="border-2 focus:border-purple-500"
+                className="border-2 focus:border-blue-500"
               />
             </div>
 
@@ -176,7 +176,7 @@ export function ContactUs() {
                 onChange={(e) => setMessage(e.target.value)}
                 required
                 rows={5}
-                className="border-2 focus:border-purple-500"
+                className="border-2 focus:border-blue-500"
               />
             </div>
 

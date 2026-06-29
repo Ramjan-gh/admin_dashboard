@@ -433,7 +433,7 @@ export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="bg-purple-500 rounded-full p-2">
+                  <div className="bg-blue-500 rounded-full p-2">
                     <Check className="w-4 h-4 text-white" />
                   </div>
                   <div>

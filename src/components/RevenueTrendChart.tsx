@@ -154,13 +154,13 @@ export function RevenueTrendChart({
       <div className="flex items-center justify-between mb-8">
         <div>
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-purple-500" />
+            <TrendingUp className="w-5 h-5 text-blue-500" />
             Revenue Over Time
           </h3>
           <p className="text-xs text-gray-500 mt-1">{viewType} breakdown</p>
         </div>
         {loading && (
-          <Loader2 className="animate-spin text-purple-600 w-5 h-5" />
+          <Loader2 className="animate-spin text-blue-600 w-5 h-5" />
         )}
       </div>
       <div className="h-[320px]">
@@ -168,8 +168,8 @@ export function RevenueTrendChart({
           <AreaChart data={chartData} key={animationKey}>
             <defs>
               <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
               </linearGradient>
             </defs>
 
@@ -216,7 +216,7 @@ export function RevenueTrendChart({
             <Area
               type="monotone"
               dataKey="amount"
-              stroke="#8b5cf6"
+              stroke="#3b82f6"
               strokeWidth={3}
               fillOpacity={1}
               fill="url(#colorRev)"

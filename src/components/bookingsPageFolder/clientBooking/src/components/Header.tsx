@@ -62,7 +62,7 @@ export function Header({ currentUser, onLogin, onLogout }: HeaderProps) {
             <motion.div
               animate={{ rotate: [0, 10, -10, 0] }}
               transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-              className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg"
+              className="w-10 h-10 bg-gradient-to-br from-blue-500 via-pink-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg"
             >
               <span className="text-xl">⚽</span>
             </motion.div>

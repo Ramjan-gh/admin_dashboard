@@ -56,7 +56,7 @@ export function RevenueDistributionPie({ data }: { data: any[] }) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex flex-col h-full">
       <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-        <PieChartIcon className="w-5 h-5 text-purple-500" />
+        <PieChartIcon className="w-5 h-5 text-blue-500" />
         Revenue Share
       </h3>
 

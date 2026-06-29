@@ -194,8 +194,8 @@ export function AnalyticsContent({
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="0%" stopColor="#8b5cf6" />
-                    <stop offset="100%" stopColor="#ec4899" />
+                    <stop offset="0%" stopColor="#3b82f6" />
+                    <stop offset="100%" stopColor="#3b82f6" />
                   </linearGradient>
                 </defs>
               </BarChart>
@@ -229,7 +229,7 @@ export function AnalyticsContent({
               <select
                 value={currentFieldId}
                 onChange={(e) => onFieldChange(e.target.value)}
-                className="w-full sm:w-auto appearance-none bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2.5 pr-10 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer border-none focus:ring-2 focus:ring-purple-300 focus:outline-none"
+                className="w-full sm:w-auto appearance-none bg-blue-500 text-white px-4 py-2.5 pr-10 rounded-lg font-semibold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer border-none focus:ring-2 focus:ring-purple-300 focus:outline-none"
               >
                 {fieldsList.map((f) => (
                   <option
@@ -371,7 +371,7 @@ export function AnalyticsContent({
                 />
                 <Bar
                   dataKey="revenue"
-                  fill="#8b5cf6"
+                  fill="#3b82f6"
                   radius={[6, 6, 0, 0]}
                   barSize={32}
                 >
@@ -379,7 +379,7 @@ export function AnalyticsContent({
                   {weeklyPatternChart.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.revenue > 40000 ? "#7c3aed" : "#a78bfa"}
+                      fill={entry.revenue > 40000 ? "#3b82f6" : "#3b82f6"}
                     />
                   ))}
                 </Bar>
@@ -456,7 +456,7 @@ export function AnalyticsContent({
                   {discountPerformanceTable.map((disc, idx) => (
                     <tr key={idx} className="text-sm border-b border-gray-100">
                       <td className="py-3">
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
                           {disc.code}
                         </span>
                       </td>
@@ -471,7 +471,7 @@ export function AnalyticsContent({
                         <span
                           className={`px-2 py-1 rounded text-xs font-medium ${
                             disc.roi >= 5
-                              ? "bg-green-100 text-green-700"
+                              ? "bg-blue-100 text-blue-700"
                               : "bg-orange-100 text-orange-700"
                           }`}
                         >
@@ -856,7 +856,7 @@ export function AnalyticsContent({
                         width: `${field.utilization}%`,
                         background:
                           field.utilization >= 70
-                            ? "linear-gradient(90deg, #10b981, #34d399)"
+                            ? "linear-gradient(#90deg, #10b981, #34d399)"
                             : field.utilization >= 50
                               ? "linear-gradient(90deg, #3b82f6, #60a5fa)"
                               : "linear-gradient(90deg, #f97316, #fb923c)",
@@ -1084,21 +1084,21 @@ export function AnalyticsContent({
           </h4>
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5" />
               <p className="text-purple-900">
                 <span className="font-medium">Saturday 6-9 PM</span> generates
                 highest revenue at ৳10,250/week
               </p>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5" />
               <p className="text-purple-900">
                 <span className="font-medium">Field A</span> contributes 36% of
                 total revenue
               </p>
             </div>
             <div className="flex items-start gap-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full mt-1.5" />
+              <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5" />
               <p className="text-purple-900">
                 Weekend bookings are{" "}
                 <span className="font-medium">42% higher</span> than weekdays

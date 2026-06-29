@@ -224,7 +224,7 @@ export function DashboardHome({ onSessionExpired }: Props) {
           </div>
           <button
             onClick={fetchData}
-            className="p-2 hover:bg-purple-50 rounded-lg text-purple-600 transition-colors self-center sm:self-auto"
+            className="p-2 hover:bg-blue-50 rounded-lg text-blue-500 transition-colors self-center sm:self-auto"
           >
             <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
           </button>
@@ -265,7 +265,7 @@ export function DashboardHome({ onSessionExpired }: Props) {
                     onClick={() => setAnalyticsTab(t.id as any)}
                     className={`py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${
                       analyticsTab === t.id
-                        ? "border-purple-600 text-purple-600"
+                        ? "blue-500"
                         : "border-transparent text-gray-400 hover:text-gray-600"
                     }`}
                   >
@@ -279,7 +279,7 @@ export function DashboardHome({ onSessionExpired }: Props) {
             <div className="p-6">
               {loading ? (
                 <div className="h-64 flex flex-col items-center justify-center gap-2">
-                  <Loader2 className="animate-spin text-purple-600 w-8 h-8" />
+                  <Loader2 className="animate-spin text-blue-500 w-8 h-8" />
                 </div>
               ) : (
                 <AnalyticsContent

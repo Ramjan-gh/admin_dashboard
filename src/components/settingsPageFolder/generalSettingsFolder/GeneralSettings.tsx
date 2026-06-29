@@ -84,7 +84,7 @@ export function GeneralSettings({
                 setOrgData({ ...orgData, name: e.target.value });
                 setHasChanges(true);
               }}
-              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
 
@@ -99,7 +99,7 @@ export function GeneralSettings({
                 setOrgData({ ...orgData, description: e.target.value });
                 setHasChanges(true);
               }}
-              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </section>
@@ -124,7 +124,7 @@ export function GeneralSettings({
                 setOrgData({ ...orgData, emails: e.target.value });
                 setHasChanges(true);
               }}
-              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
           <div>
@@ -142,7 +142,7 @@ export function GeneralSettings({
                 setOrgData({ ...orgData, phone_numbers: e.target.value });
                 setHasChanges(true);
               }}
-              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
           <div>
@@ -156,7 +156,7 @@ export function GeneralSettings({
                 setOrgData({ ...orgData, address_text: e.target.value });
                 setHasChanges(true);
               }}
-              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full mt-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </section>
@@ -176,7 +176,7 @@ export function GeneralSettings({
                   setOrgData({ ...orgData, facebook_url: e.target.value });
                   setHasChanges(true);
                 }}
-                className="flex-1 px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                className="flex-1 px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export function GeneralSettings({
                   setOrgData({ ...orgData, instagram_url: e.target.value });
                   setHasChanges(true);
                 }}
-                className="flex-1 px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                className="flex-1 px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export function GeneralSettings({
                   setOrgData({ ...orgData, whatsapp_url: e.target.value });
                   setHasChanges(true);
                 }}
-                className="flex-1 px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                className="flex-1 px-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
           </div>
@@ -225,7 +225,7 @@ export function GeneralSettings({
                 });
                 setHasChanges(true);
               }}
-              className="w-full mt-1 px-4 py-2 border rounded-lg text-blue-600 focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full mt-1 px-4 py-2 border rounded-lg text-blue-600 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </section>

@@ -48,7 +48,7 @@ export function TopBar({ setSidebarOpen, onLogout }: TopBarProps) {
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-colors border border-transparent hover:border-gray-200"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shadow-sm">
                 <span className="text-white text-xs font-bold">{initials}</span>
               </div>
             </button>
