@@ -137,7 +137,7 @@ export function PointsAndTiersSettings({
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
       </div>
     );
   }
@@ -147,7 +147,7 @@ export function PointsAndTiersSettings({
       {/* POINT EXCHANGE RATE CONFIGURATION CARD */}
       <div className="bg-white p-5 border border-gray-200 rounded-xl shadow-sm">
         <div className="flex items-start gap-3 mb-4">
-          <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
+          <div className="p-2 bg-blue-50 text-blue-500 rounded-lg">
             <Coins className="w-5 h-5" />
           </div>
           <div>
@@ -182,7 +182,7 @@ export function PointsAndTiersSettings({
           <button
             type="submit"
             disabled={exchangeRateLoading}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:bg-gray-400 h-[38px]"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:bg-gray-400 h-[38px]"
           >
             {exchangeRateLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -210,7 +210,7 @@ export function PointsAndTiersSettings({
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition"
+          className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
         >
           <Plus className="w-4 h-4" /> Add Tier
         </button>
@@ -265,7 +265,7 @@ export function PointsAndTiersSettings({
                     <div className="flex gap-1">
                       <button
                         onClick={() => openEditModal(rawTier)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md hover:bg-gray-50"
+                        className="p-1.5 text-gray-400 hover:text-blue-500 rounded-md hover:bg-gray-50"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -296,7 +296,7 @@ export function PointsAndTiersSettings({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Points Multiplier:</span>
-                      <span className="font-semibold text-purple-600">
+                      <span className="font-semibold text-blue-500">
                         {pointsMultiplier}x
                       </span>
                     </div>
@@ -436,7 +436,7 @@ export function PointsAndTiersSettings({
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+                  className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
                 >
                   {actionLoading && (
                     <Loader2 className="w-4 h-4 animate-spin" />

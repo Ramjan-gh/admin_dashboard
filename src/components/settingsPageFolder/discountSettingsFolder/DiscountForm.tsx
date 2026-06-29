@@ -9,12 +9,12 @@ export function DiscountForm({
 }: any) {
   return (
     <div
-      className={`bg-white p-6 rounded-2xl border shadow-sm ring-1 transition-all duration-500 ${newDiscount.id ? "border-blue-500 ring-purple-100" : "border-purple-100 ring-purple-50"}`}
+      className={`bg-white p-6 rounded-2xl border shadow-sm ring-1 transition-all duration-500 ${newDiscount.id ? "border-blue-500 ring-blue-100" : "border-blue-100 ring-blue-50"}`}
     >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <div
-            className={`p-2 rounded-lg transition-colors ${newDiscount.id ? "bg-purple-600" : "bg-gray-800"}`}
+            className={`p-2 rounded-lg transition-colors ${newDiscount.id ? "bg-blue-500" : "bg-gray-800"}`}
           >
             <Ticket className="w-4 h-4 text-white" />
           </div>
@@ -40,7 +40,7 @@ export function DiscountForm({
           </label>
           <input
             type="text"
-            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400 focus:bg-white outline-none uppercase font-mono transition-all"
+            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none uppercase font-mono transition-all"
             value={newDiscount.p_code}
             onChange={(e) =>
               setNewDiscount({ ...newDiscount, p_code: e.target.value })
@@ -62,7 +62,7 @@ export function DiscountForm({
                   p_discount_type: "percentage",
                 })
               }
-              className={`flex-1 rounded-lg text-xs font-bold transition-all ${newDiscount.p_discount_type === "percentage" ? "bg-white text-purple-600 shadow-sm" : "text-gray-500"}`}
+              className={`flex-1 rounded-lg text-xs font-bold transition-all ${newDiscount.p_discount_type === "percentage" ? "bg-white text-blue-500 shadow-sm" : "text-gray-500"}`}
             >
               {" "}
               %{" "}
@@ -72,7 +72,7 @@ export function DiscountForm({
               onClick={() =>
                 setNewDiscount({ ...newDiscount, p_discount_type: "fixed" })
               }
-              className={`flex-1 rounded-lg text-xs font-bold transition-all ${newDiscount.p_discount_type === "fixed" ? "bg-white text-purple-600 shadow-sm" : "text-gray-500"}`}
+              className={`flex-1 rounded-lg text-xs font-bold transition-all ${newDiscount.p_discount_type === "fixed" ? "bg-white text-blue-500 shadow-sm" : "text-gray-500"}`}
             >
               {" "}
               Tk{" "}
@@ -145,7 +145,7 @@ export function DiscountForm({
 
         <button
           onClick={onAdd}
-          className={`w-full h-[42px] rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-white ${newDiscount.id ? "bg-purple-600 hover:bg-purple-700 shadow-lg shadow-purple-100" : "bg-gray-900 hover:bg-purple-600"}`}
+          className={`w-full h-[42px] rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-white ${newDiscount.id ? "bg-blue-500 hover:bg-blue-700 shadow-lg shadow-blue-100" : "bg-gray-900 hover:bg-blue-500"}`}
         >
           {newDiscount.id ? "Update" : "Create"}
         </button>

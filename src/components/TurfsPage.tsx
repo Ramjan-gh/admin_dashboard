@@ -40,7 +40,7 @@ export function TurfsPage({ onSessionExpired }: Props) {
           </div>
           <button
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition-all active:scale-95"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-500 text-white rounded-xl hover:shadow-lg transition-all active:scale-95"
           >
             <Plus className="w-5 h-5" />
             <span className="font-semibold">Add New Field</span>

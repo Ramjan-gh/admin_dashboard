@@ -51,11 +51,11 @@ export function DiscountCard({
 
   return (
     <div
-      className={`group relative flex rounded-3xl border transition-all duration-300 overflow-hidden shadow-sm hover:shadow-md ${isExpired ? "bg-red-50/30 border-red-100" : isPaused ? "bg-gray-50 border-gray-200" : "bg-white border-purple-100"}`}
+      className={`group relative flex rounded-3xl border transition-all duration-300 overflow-hidden shadow-sm hover:shadow-md ${isExpired ? "bg-red-50/30 border-red-100" : isPaused ? "bg-gray-50 border-gray-200" : "bg-white border-blue-100"}`}
     >
       {/* Left Banner */}
       <div
-        className={`w-32 flex flex-col items-center justify-center border-r-2 border-dashed px-4 ${isExpired ? "bg-red-100/50 border-red-200" : isPaused ? "bg-gray-200/50 border-gray-300" : "bg-purple-600 border-purple-700"}`}
+        className={`w-32 flex flex-col items-center justify-center border-r-2 border-dashed px-4 ${isExpired ? "bg-red-100/50 border-red-200" : isPaused ? "bg-gray-200/50 border-gray-300" : "bg-blue-600 border-blue-700"}`}
       >
         <span
           className={`text-2xl font-black ${isPaused || isExpired ? "text-gray-600" : "text-white"}`}
@@ -64,7 +64,7 @@ export function DiscountCard({
           {d.discount_type === "percentage" ? "%" : ""}
         </span>
         <span
-          className={`text-[10px] font-bold uppercase ${isPaused || isExpired ? "text-gray-500" : "text-purple-100"}`}
+          className={`text-[10px] font-bold uppercase ${isPaused || isExpired ? "text-gray-500" : "text-blue-100"}`}
         >
           {d.discount_type === "percentage" ? "Discount" : "Taka Off"}
         </span>
@@ -116,7 +116,7 @@ export function DiscountCard({
             </button>
             <button
               onClick={() => handleToggleWithToast(d.id, d.is_active, d.code)}
-              className={`px-3 py-1.5 rounded-xl transition-all border font-bold text-[10px] uppercase ${d.is_active ? "bg-amber-500 text-white" : "bg-green-600 text-white"}`}
+              className={`px-3 py-1.5 rounded-xl transition-all border font-bold text-[10px] uppercase ${d.is_active ? "bg-blue-500 text-white" : "bg-green-600 text-white"}`}
             >
               {d.is_active ? "Pause" : "Go Live"}
             </button>
@@ -132,7 +132,7 @@ export function DiscountCard({
         {/* Footer Info */}
         <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-400">
+            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-400">
               <Users className="w-3 h-3" />
             </div>
             <div>
@@ -145,7 +145,7 @@ export function DiscountCard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-400">
+            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-400">
               <Calendar className="w-3 h-3" />
             </div>
             <div>

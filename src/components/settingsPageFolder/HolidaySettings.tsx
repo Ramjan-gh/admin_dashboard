@@ -47,7 +47,7 @@ export function HolidaySettings({
           <input
             type="checkbox"
             id="isOpen"
-            className="w-4 h-4 accent-purple-600 cursor-pointer"
+            className="w-4 h-4 accent-blue-600 cursor-pointer"
             checked={newHoliday.p_is_open}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               setNewHoliday({
@@ -65,7 +65,7 @@ export function HolidaySettings({
         </div>
         <button
           onClick={handleAddSchedule}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors font-medium"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors font-medium"
         >
           <Plus className="w-4 h-4" /> Add
         </button>

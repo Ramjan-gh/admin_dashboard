@@ -12,9 +12,9 @@ export function BannerSettings({
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-purple-600" /> Promotional Banners
+          <ImageIcon className="w-5 h-5 text-blue-600" /> Promotional Banners
         </h2>
-        <label className="cursor-pointer bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+        <label className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
           {loading ? (
             <Loader2 className="animate-spin w-4 h-4" />
           ) : (

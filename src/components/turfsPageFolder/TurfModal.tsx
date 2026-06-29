@@ -121,7 +121,7 @@ export function TurfModal({
           <button
             type="submit"
             disabled={loading || !!uploading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-2xl font-bold hover:shadow-xl disabled:opacity-50 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+            className="w-full bg-blue-500 text-white py-4 rounded-2xl font-bold hover:shadow-xl disabled:opacity-50 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
           >
             {loading ? (
               <Loader2 className="animate-spin w-5 h-5" />

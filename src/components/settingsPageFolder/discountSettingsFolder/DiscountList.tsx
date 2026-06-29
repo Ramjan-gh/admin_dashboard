@@ -19,7 +19,7 @@ export function DiscountList({
             Manage your active and scheduled promotions
           </p>
         </div>
-        <span className="text-[10px] bg-purple-100 px-3 py-1 rounded-full font-bold text-purple-600">
+        <span className="text-[10px] bg-blue-100 px-3 py-1 rounded-full font-bold text-blue-600">
           {discounts.length} CODES
         </span>
       </div>

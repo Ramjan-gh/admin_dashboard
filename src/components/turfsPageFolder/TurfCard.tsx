@@ -15,7 +15,7 @@ export function TurfCard({ turf, index, onEdit, onDelete }: TurfCardProps) {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`bg-white w-96 rounded-2xl overflow-hidden border border-gray-200 shadow-sm transition-shadow ${
+          className={`bg-white w-96 rounded-2xl overflow-hidden border border-blue-200 shadow-sm transition-shadow ${
             snapshot.isDragging ? "shadow-2xl ring-2 ring-blue-500 z-50" : ""
           }`}
         >
@@ -51,22 +51,22 @@ export function TurfCard({ turf, index, onEdit, onDelete }: TurfCardProps) {
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2">
               <StatBox label="Name" value={turf.name} color="blue" />
-              <StatBox label="Size" value={turf.size || "N/A"} color="purple" />
+              <StatBox label="Size" value={turf.size || "N/A"} color="blue" />
               <StatBox
                 label="Cap"
                 value={turf.player_capacity || "-"}
-                color="pink"
+                color="blue"
               />
             </div>
 
-            <div className="px-4 py-2.5 w-full bg-gray-50 text-gray-600 rounded-xl text-xs text-center border border-gray-100 italic">
+            <div className="px-4 py-2.5 w-full text-blue-500 rounded-xl text-xs text-center border border-blue-300 italic">
               {turf.description || "No description provided"}
             </div>
 
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => onEdit(turf)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors shadow-sm"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-gray-800 transition-colors shadow-sm"
               >
                 <Edit className="w-4 h-4" />
                 <span className="text-sm font-semibold">Edit</span>
@@ -95,14 +95,12 @@ function StatBox({
   color: string;
 }) {
   const colors: any = {
-    blue: "bg-blue-50 border-blue-100 text-blue-400 text-blue-900",
-    purple: "bg-purple-50 border-purple-100 text-purple-400 text-purple-900",
-    pink: "bg-pink-50 border-pink-100 text-pink-400 text-pink-900",
+    blue: "border-blue-300 text-blue-400 text-blue-900",
   };
   const classes = colors[color].split(" ");
   return (
     <div
-      className={`text-center p-2 ${classes[0]} rounded-xl border ${classes[1]}`}
+      className={`text-center p-2 ${classes[0]} rounded-lg border ${classes[1]}`}
     >
       <p className={`text-[10px] uppercase font-black ${classes[2]}`}>
         {label}

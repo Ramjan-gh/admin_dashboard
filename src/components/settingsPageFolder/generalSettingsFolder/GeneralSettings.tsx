@@ -43,7 +43,7 @@ export function GeneralSettings({
         {/* 2. Identity & Branding */}
         <section className="space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
-            <Building className="w-4 h-4 text-purple-600" /> Identity & Branding
+            <Building className="w-4 h-4 text-blue-600" /> Identity & Branding
           </h3>
 
           <div className="flex flex-col items-center justify-center py-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
@@ -107,7 +107,7 @@ export function GeneralSettings({
         {/* 3. Contact Information */}
         <section className="space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
-            <Globe className="w-4 h-4 text-purple-600" /> Contact Info
+            <Globe className="w-4 h-4 text-blue-600" /> Contact Info
           </h3>
           <div>
             <label className="text-sm font-medium text-gray-600">
@@ -164,7 +164,7 @@ export function GeneralSettings({
         {/* 4. Social Media Links */}
         <section className="space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
-            <Instagram className="w-4 h-4 text-purple-600" /> Social Presence
+            <Instagram className="w-4 h-4 text-blue-600" /> Social Presence
           </h3>
           <div className="grid grid-cols-1 gap-4">
             <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export function GeneralSettings({
         {/* 5. Location Details */}
         <section className="space-y-4">
           <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
-            <MapPin className="w-4 h-4 text-purple-600" /> Map Integration
+            <MapPin className="w-4 h-4 text-blue-600" /> Map Integration
           </h3>
           <div>
             <label className="text-sm font-medium text-gray-600">
@@ -236,7 +236,7 @@ export function GeneralSettings({
         <button
           onClick={handleUpdateOrg}
           disabled={loading}
-          className="flex items-center gap-2 px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-md transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
             <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />

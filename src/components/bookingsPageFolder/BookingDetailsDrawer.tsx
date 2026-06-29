@@ -47,7 +47,7 @@ export function BookingDetailsDrawer({
       <div className="bg-white w-full max-w-md h-full overflow-y-auto relative shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
             <p className="text-gray-500 font-medium">Fetching secure data...</p>
           </div>
         ) : (
@@ -106,7 +106,7 @@ export function BookingDetailsDrawer({
                       Booking Code
                     </p>
                     <p
-                      className={`text-xl font-mono font-black ${isCancelled ? "text-gray-400 line-through" : "text-purple-700"}`}
+                      className={`text-xl font-mono font-black ${isCancelled ? "text-gray-400 line-through" : "text-blue-700"}`}
                     >
                       {details?.booking?.booking_code ?? "N/A"}
                     </p>
@@ -162,7 +162,7 @@ export function BookingDetailsDrawer({
                     </div>
                     <div className="col-span-2 bg-gray-50 p-3 rounded-lg flex items-center gap-3">
                       <div
-                        className={`p-2 rounded ${isCancelled ? "bg-gray-200 text-gray-400" : "bg-purple-100 text-purple-600"}`}
+                        className={`p-2 rounded ${isCancelled ? "bg-gray-200 text-gray-400" : "bg-blue-100 text-blue-600"}`}
                       >
                         <Users className="w-4 h-4" />
                       </div>
@@ -204,7 +204,7 @@ export function BookingDetailsDrawer({
                               className={
                                 isCancelled
                                   ? "text-gray-400"
-                                  : "text-purple-600"
+                                  : "text-blue-600"
                               }
                             >
                               <Calendar className="w-4 h-4" />
@@ -317,7 +317,7 @@ export function BookingDetailsDrawer({
                         className={
                           isCancelled
                             ? "text-gray-400 line-through"
-                            : "text-purple-700"
+                            : "text-blue-700"
                         }
                       >
                         ৳{finalAmount}
