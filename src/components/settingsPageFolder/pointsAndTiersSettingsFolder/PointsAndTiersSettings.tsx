@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, Edit2, Loader2, Award, Info, Coins, Save } from "lucide-react";
 
 export type MembershipTier = {
@@ -19,7 +19,7 @@ type PointsAndTiersSettingsProps = {
   onUpdateTier: (id: string, updates: Partial<MembershipTier>) => Promise<void>;
   onDeleteTier: (id: string) => Promise<void>;
   
-  // ➕ Added Organization State Parameters for global exchange rate mapping
+  // Organization State Parameters for global exchange rate mapping
   pointExchangeRate: number;
   onUpdateExchangeRate: (rate: number) => Promise<void>;
 };
@@ -49,6 +49,11 @@ export function PointsAndTiersSettings({
   const [badgeColor, setBadgeColor] = useState("#6B46C1");
   const [description, setDescription] = useState("");
   const [rewardInterval, setRewardInterval] = useState(30);
+
+  // Keep local exchange rate in sync if prop changes downstream
+  useEffect(() => {
+    setLocalExchangeRate(pointExchangeRate.toString());
+  }, [pointExchangeRate]);
 
   const openCreateModal = () => {
     setEditingTier(null);
@@ -91,21 +96,21 @@ export function PointsAndTiersSettings({
     e.preventDefault();
     setActionLoading(true);
     try {
+      const payload = {
+        name,
+        min_points: minPoints,
+        discount_percentage: discount,
+        points_multiplier: multiplier,
+        badge_color: badgeColor,
+        description,
+        reward_interval: rewardInterval,
+      };
+
       if (editingTier) {
-        await onUpdateTier(editingTier.id, {
-          discount_percentage: discount,
-          points_multiplier: multiplier,
-        });
+        // 🔄 Pass the complete layout payload structure instead of just discount and multiplier
+        await onUpdateTier(editingTier.id, payload);
       } else {
-        await onCreateTier({
-          name,
-          min_points: minPoints,
-          discount_percentage: discount,
-          points_multiplier: multiplier,
-          badge_color: badgeColor,
-          description,
-          reward_interval: rewardInterval,
-        });
+        await onCreateTier(payload);
       }
       setIsModalOpen(false);
     } catch (error) {
@@ -139,7 +144,7 @@ export function PointsAndTiersSettings({
 
   return (
     <div className="space-y-6">
-      {/* ➕ POINT EXCHANGE RATE CONFIGURATION CARD */}
+      {/* POINT EXCHANGE RATE CONFIGURATION CARD */}
       <div className="bg-white p-5 border border-gray-200 rounded-xl shadow-sm">
         <div className="flex items-start gap-3 mb-4">
           <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
@@ -220,10 +225,7 @@ export function PointsAndTiersSettings({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tiers.map((rawTier, index) => {
-            if (!rawTier) {
-              console.warn(`Tier at index ${index} is null or undefined.`);
-              return null;
-            }
+            if (!rawTier) return null;
 
             const tierId = rawTier.id || `fallback-id-${index}`;
             const tierName = rawTier.name || "Unnamed Tier";
@@ -241,10 +243,6 @@ export function PointsAndTiersSettings({
             const pointsMultiplier = typeof rawTier.points_multiplier === "number"
               ? rawTier.points_multiplier
               : Number(rawTier.points_multiplier || 1);
-
-            if (rawTier.min_points === undefined) {
-              console.error("CRITICAL: Received a tier object missing 'min_points':", rawTier);
-            }
 
             return (
               <div
@@ -320,16 +318,6 @@ export function PointsAndTiersSettings({
                 : "Create New Membership Tier"}
             </h3>
 
-            {editingTier && (
-              <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-lg flex items-start gap-2 text-xs">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                <p>
-                  Note: The API only permits updating the discount percentage
-                  and points multiplier fields.
-                </p>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -338,10 +326,9 @@ export function PointsAndTiersSettings({
                 <input
                   type="text"
                   required
-                  disabled={!!editingTier}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm disabled:bg-gray-100"
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm"
                   placeholder="e.g. Gold Tier"
                 />
               </div>
@@ -354,10 +341,9 @@ export function PointsAndTiersSettings({
                   <input
                     type="number"
                     required
-                    disabled={!!editingTier}
                     value={minPoints}
                     onChange={(e) => setMinPoints(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm disabled:bg-gray-100"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
                   />
                 </div>
                 <div>
@@ -367,10 +353,9 @@ export function PointsAndTiersSettings({
                   <input
                     type="number"
                     required
-                    disabled={!!editingTier}
                     value={rewardInterval}
                     onChange={(e) => setRewardInterval(Number(e.target.value))}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm disabled:bg-gray-100"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
                   />
                 </div>
               </div>
@@ -413,17 +398,15 @@ export function PointsAndTiersSettings({
                 <div className="flex gap-2 items-center">
                   <input
                     type="color"
-                    disabled={!!editingTier}
                     value={badgeColor}
                     onChange={(e) => setBadgeColor(e.target.value)}
-                    className="w-10 h-9 p-0 border border-gray-300 rounded-lg cursor-pointer disabled:opacity-50"
+                    className="w-10 h-9 p-0 border border-gray-300 rounded-lg cursor-pointer"
                   />
                   <input
                     type="text"
-                    disabled={!!editingTier}
                     value={badgeColor}
                     onChange={(e) => setBadgeColor(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm uppercase disabled:bg-gray-100"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm uppercase"
                   />
                 </div>
               </div>
@@ -433,10 +416,9 @@ export function PointsAndTiersSettings({
                   Description
                 </label>
                 <textarea
-                  disabled={!!editingTier}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm disabled:bg-gray-100"
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm"
                   rows={2}
                   placeholder="Describe tier privileges..."
                 />

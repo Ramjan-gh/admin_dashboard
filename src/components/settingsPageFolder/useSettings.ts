@@ -6,13 +6,9 @@ import { authFetch } from ".././authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 const TIERS_TABLE_URL = `${BASE_URL}/rest/v1/membership_tiers`;
-
-const ORG_TABLE_URL = `${BASE_URL}/rest/v1/rpc/get_organization`;
 const SCHEDULE_TABLE_URL = `${BASE_URL}/rest/v1/business_schedule`;
 const DISCOUNTS_TABLE_URL = `${BASE_URL}/rest/v1/rpc/get_discount_codes`;
-const MEDIA_TABLE_URL = `${BASE_URL}/rest/v1/media`; // Added for custom banner bypassing
-
-// --- Interfaces ---
+const MEDIA_TABLE_URL = `${BASE_URL}/rest/v1/media`;
 
 interface NewHolidayState {
   id?: string;
@@ -54,8 +50,6 @@ interface MediaItem {
   media_type: string;
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useSettings(onSessionExpired: () => void) {
   const [activeTab, setActiveTab] = useState("general");
   const [hasChanges, setHasChanges] = useState(false);
@@ -80,7 +74,6 @@ export function useSettings(onSessionExpired: () => void) {
   const [newHoliday, setNewHoliday] = useState<NewHolidayState>(initialHoliday);
   const [newDiscount, setNewDiscount] = useState<NewDiscountState>(initialDiscount);
 
-  // Shorthand helpers
   const getBaseHeaders = useCallback(() => ({
     "Content-Type": "application/json",
     apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -112,7 +105,6 @@ export function useSettings(onSessionExpired: () => void) {
 
   // --- Fetchers ---
 
-  // Bypassed RPC logic for Banners
   const fetchBanners = useCallback(async () => {
     try {
       const res = await authFetch(
@@ -141,20 +133,15 @@ export function useSettings(onSessionExpired: () => void) {
 
   const fetchMembershipTiers = useCallback(async () => {
     try {
-      // 1. Strip out ALL order query parameters from the network layer completely. 
-      // This strips the sorting command away from PostgREST so it cannot throw a 400 error.
       const res = await authFetch(
-        `${BASE_URL}/rest/v1/membership_tiers?select=*`, 
-        { 
-          method: "GET", 
-          headers: getBaseHeaders() 
-        },
+        `${BASE_URL}/rest/v1/membership_tiers?select=*`,
+        { method: "GET", headers: getBaseHeaders() },
         onSessionExpired
       );
-      
+
       if (res.ok) {
         const data = await res.json();
-        
+
         const mappedData = Array.isArray(data) ? data.map((tier: any) => ({
           id: tier.id ?? tier.p_id,
           name: tier.name ?? tier.p_name,
@@ -166,47 +153,41 @@ export function useSettings(onSessionExpired: () => void) {
           reward_interval: tier.reward_interval !== undefined ? tier.reward_interval : (tier.p_reward_interval ?? null),
         })) : [];
 
-        // 2. Perform a safe client-side fallback sort directly on the mapped array values
-        const safelySortedData = mappedData.sort((a, b) => a.min_points - b.min_points);
-
+        const safelySortedData = mappedData.sort((a: MembershipTier, b: MembershipTier) => a.min_points - b.min_points);
         setTiers(safelySortedData);
       } else {
         const errLog = await res.json().catch(() => null);
-        console.error("Supabase direct query rejection payload:", errLog);
+        console.error("Supabase membership tiers rejection:", errLog);
       }
     } catch (err) {
       console.error("Error fetching membership tiers:", err);
     }
   }, [getBaseHeaders, onSessionExpired]);
-  
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
-      // Complete RPC bypass architecture for both read and write
       const [orgRes, scheduleRes, discountRes] = await Promise.all([
-        // Direct table read bypasses the legacy rpc/get_organization function
-        authFetch(`${BASE_URL}/rest/v1/organization_info?select=*&limit=1`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
-        authFetch(`${SCHEDULE_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
-        authFetch(`${DISCOUNTS_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r) => r.json()),
+        authFetch(`${BASE_URL}/rest/v1/organization_info?select=*&limit=1`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r: Response) => r.json()),
+        authFetch(`${SCHEDULE_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r: Response) => r.json()),
+        authFetch(`${DISCOUNTS_TABLE_URL}?select=*`, { method: "GET", headers: getBaseHeaders() }, onSessionExpired).then((r: Response) => r.json()),
       ]);
 
-      // PostgREST returns an array for tables even with limit=1, safely extract the first row
       if (orgRes) {
         const structuralData = Array.isArray(orgRes) ? orgRes[0] : orgRes;
         if (structuralData) setOrgData(structuralData);
       }
-      
+
       if (Array.isArray(scheduleRes)) setHolidays(scheduleRes);
       if (Array.isArray(discountRes)) setDiscounts(discountRes);
 
       await Promise.all([
         fetchBanners(),
         fetchGallery(),
-        fetchMembershipTiers()
+        fetchMembershipTiers(),
       ]);
     } catch (error) {
-      console.error("Error fetching settings via raw tables:", error);
+      console.error("Error fetching settings:", error);
     } finally {
       setLoading(false);
     }
@@ -220,20 +201,18 @@ export function useSettings(onSessionExpired: () => void) {
     if (!orgData) return;
     setLoading(true);
     try {
-      // 1. Format inputs clean and split values if a plain string bypass context was used
       const cleanEmails = Array.isArray(orgData.emails)
-        ? orgData.emails.map(e => String(e).trim())
+        ? orgData.emails.map((e: string) => String(e).trim())
         : typeof orgData.emails === "string"
-          ? (orgData.emails as string).split(",").map((e) => e.trim())
+          ? (orgData.emails as string).split(",").map((e: string) => e.trim())
           : [];
 
       const cleanPhoneNumbers = Array.isArray(orgData.phone_numbers)
-        ? orgData.phone_numbers.map(p => String(p).trim())
+        ? orgData.phone_numbers.map((p: string) => String(p).trim())
         : typeof orgData.phone_numbers === "string"
-          ? (orgData.phone_numbers as string).split(",").map((p) => p.trim())
+          ? (orgData.phone_numbers as string).split(",").map((p: string) => p.trim())
           : [];
 
-      // 2. Map payload names directly to underlying raw table columns
       const dbPayload = {
         name: orgData.name,
         description: orgData.description,
@@ -246,22 +225,19 @@ export function useSettings(onSessionExpired: () => void) {
         instagram_url: orgData.instagram_url,
         tiktok_url: orgData.tiktok_url,
         whatsapp_url: orgData.whatsapp_url,
-        points_exchange_rate: Number(orgData.points_exchange_rate ?? 0), 
+        points_exchange_rate: Number(orgData.points_exchange_rate ?? 0),
       };
 
-      // 3. Find WHATEVER key serves as the ID to bypass the safety check
       const rawObject = orgData as Record<string, any>;
       const actualKeyName = Object.keys(rawObject).find(key => key.toLowerCase().includes('id')) || 'id';
 
-      // 4. Target the single record by checking if its ID is not null, restricted to 1 row
-      // This forces a valid WHERE clause behind the scenes, satisfying the database safety policy!
       const response = await authFetch(
-        `${BASE_URL}/rest/v1/organization_info?${actualKeyName}=not.is.null&limit=1`, 
+        `${BASE_URL}/rest/v1/organization_info?${actualKeyName}=not.is.null&limit=1`,
         {
           method: "PATCH",
           headers: {
             ...getBaseHeaders(),
-            "Prefer": "return=representation" // Demands the mutated row back
+            "Prefer": "return=representation",
           },
           body: JSON.stringify(dbPayload),
         },
@@ -270,70 +246,78 @@ export function useSettings(onSessionExpired: () => void) {
 
       if (response.ok) {
         const updateConfirmation = await response.json().catch(() => []);
-        
-        // Let's verify right here in the logs if it mutated or came back empty
-        console.log("Supabase raw response array payload:", updateConfirmation);
-
         if (Array.isArray(updateConfirmation) && updateConfirmation.length === 0) {
-          console.warn("⚠️ Data layer warning: 0 rows were updated. The table might be completely empty.");
           toast.error("Update failed: No organization row found to update.");
           return;
         }
-
         setHasChanges(false);
         toast.success("Organization updated successfully");
-        await fetchAllData(); 
+        await fetchAllData();
       } else {
         const errorJson = await response.json().catch(() => null);
         console.error("Direct table patch rejected:", errorJson);
-        toast.error(errorJson?.message || "Database rejected raw update mapping.");
+        toast.error(errorJson?.message || "Failed to update organization.");
       }
     } catch (error) {
-      console.error("Failed executing client-side table write:", error);
+      console.error("Failed executing org update:", error);
       toast.error("Failed to update organization");
     } finally {
       setLoading(false);
     }
-  };const handleUpdateExchangeRate = async (rate: number) => {
-  if (!orgData) return;
-  
-  // 1. Build updated orgData with the new rate
-  const updatedOrgData = { ...orgData, points_exchange_rate: rate };
-  setOrgData(updatedOrgData); // sync local state first
+  };
 
-  try {
-    const res = await rpc("update_organization", {
-      p_name: updatedOrgData.name,
-      p_description: updatedOrgData.description,
-      p_logo_url: updatedOrgData.logo_url,
-      p_emails: Array.isArray(updatedOrgData.emails)
-        ? updatedOrgData.emails
-        : String(updatedOrgData.emails).split(",").map(e => e.trim()),
-      p_phone_numbers: Array.isArray(updatedOrgData.phone_numbers)
-        ? updatedOrgData.phone_numbers
-        : String(updatedOrgData.phone_numbers).split(",").map(p => p.trim()),
-      p_points_exchange_rate: rate,
-      p_address_text: updatedOrgData.address_text,
-      p_address_google_maps_url: updatedOrgData.address_google_maps_url,
-      p_facebook_url: updatedOrgData.facebook_url,
-      p_instagram_url: updatedOrgData.instagram_url ?? null,
-      p_tiktok_url: updatedOrgData.tiktok_url ?? null,
-      p_whatsapp_url: updatedOrgData.whatsapp_url ?? null,
-    });
+  // --- Exchange Rate ---
 
-    if (res.ok) {
-      toast.success("Exchange rate updated successfully!");
-      await fetchAllData();
-    } else {
-      const err = await res.json().catch(() => null);
-      toast.error(err?.message || "Failed to update exchange rate.");
-      setOrgData(orgData); // rollback on failure
+  const handleUpdateExchangeRate = async (rate: number) => {
+    if (!orgData) return;
+
+    const previousOrgData = orgData;
+    const updatedOrgData = { ...orgData, points_exchange_rate: rate };
+    setOrgData(updatedOrgData);
+
+    try {
+      const cleanEmails = Array.isArray(updatedOrgData.emails)
+        ? updatedOrgData.emails.map((e: string) => String(e).trim())
+        : typeof updatedOrgData.emails === "string"
+          ? (updatedOrgData.emails as string).split(",").map((e: string) => e.trim())
+          : [];
+
+      const cleanPhoneNumbers = Array.isArray(updatedOrgData.phone_numbers)
+        ? updatedOrgData.phone_numbers.map((p: string) => String(p).trim())
+        : typeof updatedOrgData.phone_numbers === "string"
+          ? (updatedOrgData.phone_numbers as string).split(",").map((p: string) => p.trim())
+          : [];
+
+      const res = await rpc("update_organization", {
+        p_name: updatedOrgData.name,
+        p_description: updatedOrgData.description,
+        p_logo_url: updatedOrgData.logo_url,
+        p_emails: cleanEmails,
+        p_phone_numbers: cleanPhoneNumbers,
+        p_points_exchange_rate: rate,
+        p_address_text: updatedOrgData.address_text,
+        p_address_google_maps_url: updatedOrgData.address_google_maps_url,
+        p_facebook_url: updatedOrgData.facebook_url,
+        p_instagram_url: updatedOrgData.instagram_url ?? null,
+        p_tiktok_url: updatedOrgData.tiktok_url ?? null,
+        p_whatsapp_url: updatedOrgData.whatsapp_url ?? null,
+      });
+
+      if (res.ok) {
+        toast.success("Exchange rate updated successfully!");
+        await fetchAllData();
+      } else {
+        const err = await res.json().catch(() => null);
+        console.error("Exchange rate update rejected:", err);
+        toast.error(err?.message || "Failed to update exchange rate.");
+        setOrgData(previousOrgData);
+      }
+    } catch {
+      toast.error("Network error while saving exchange rate.");
+      setOrgData(previousOrgData);
     }
-  } catch {
-    toast.error("Network error while saving exchange rate.");
-    setOrgData(orgData); // rollback
-  }
-};
+  };
+
   // --- Holidays / Schedule ---
 
   const handleAddSchedule = async () => {
@@ -420,7 +404,7 @@ export function useSettings(onSessionExpired: () => void) {
     }
   };
 
-  // --- Points & Tiers Actions ---
+  // --- Tiers ---
 
   const handleCreateTier = async (tier: Omit<MembershipTier, "id">) => {
     setTiersLoading(true);
@@ -435,32 +419,27 @@ export function useSettings(onSessionExpired: () => void) {
         reward_interval: tier.reward_interval,
       };
 
-      const headers = {
-        ...getBaseHeaders(),
-        "Prefer": "return=representation",
-      };
-
       const res = await authFetch(
         TIERS_TABLE_URL,
         {
           method: "POST",
-          headers: headers,
+          headers: { ...getBaseHeaders(), "Prefer": "return=representation" },
           body: JSON.stringify(dbPayload),
         },
         onSessionExpired
       );
-      
+
       if (res.ok) {
         toast.success("Membership tier created successfully!");
         await fetchMembershipTiers();
       } else {
         const errorJson = await res.json().catch(() => null);
-        console.error("🔴 SUPABASE REJECTION REASON:", errorJson);
-        toast.error(`Failed to build tier: ${errorJson?.message || "Invalid Data Structure"}`);
+        console.error("Tier creation rejected:", errorJson);
+        toast.error(`Failed to create tier: ${errorJson?.message || "Invalid data"}`);
       }
     } catch (error) {
-      console.error("Network Error:", error);
-      toast.error("Network interface breakdown during creation.");
+      console.error("Network error:", error);
+      toast.error("Network error during tier creation.");
     } finally {
       setTiersLoading(false);
     }
@@ -470,27 +449,38 @@ export function useSettings(onSessionExpired: () => void) {
     setTiersLoading(true);
     try {
       const dbPayload = {
+        name: updates.name,
+        min_points: updates.min_points,
         discount_percentage: updates.discount_percentage,
         points_multiplier: updates.points_multiplier,
+        badge_color: updates.badge_color,
+        description: updates.description,
+        reward_interval: updates.reward_interval,
       };
 
       const res = await authFetch(
         `${TIERS_TABLE_URL}?id=eq.${id}`,
         {
           method: "PATCH",
-          headers: getBaseHeaders(),
+          headers: {
+            ...getBaseHeaders(),
+            "Prefer": "return=representation",
+          },
           body: JSON.stringify(dbPayload),
         },
         onSessionExpired
       );
+
       if (res.ok) {
         toast.success("Membership tier updated successfully!");
         await fetchMembershipTiers();
       } else {
-        toast.error("Failed to adjust tier updates.");
+        const errJson = await res.json().catch(() => null);
+        console.error("Tier PATCH rejected:", errJson);
+        toast.error(errJson?.message || "Failed to update tier.");
       }
     } catch {
-      toast.error("Network interface error occurred during modification.");
+      toast.error("Network error during tier update.");
     } finally {
       setTiersLoading(false);
     }
@@ -508,13 +498,13 @@ export function useSettings(onSessionExpired: () => void) {
         onSessionExpired
       );
       if (res.ok) {
-        toast.success("Membership tier cleared away successfully.");
+        toast.success("Membership tier deleted successfully.");
         await fetchMembershipTiers();
       } else {
-        toast.error("Failed to erase tier.");
+        toast.error("Failed to delete tier.");
       }
     } catch {
-      toast.error("Network processing failure while deleting.");
+      toast.error("Network error during tier deletion.");
     } finally {
       setTiersLoading(false);
     }
@@ -554,7 +544,7 @@ export function useSettings(onSessionExpired: () => void) {
       const dbRes = await rpc("add_media", { p_use_case: "banner", p_media_type: "image", p_file_url: publicUrl });
 
       if (dbRes.ok) { toast.success("Banner uploaded successfully!"); fetchBanners(); }
-      else throw new Error("Failed to save banner details to database");
+      else throw new Error("Failed to save banner to database");
     } catch (error: any) {
       toast.error(error.message || "An error occurred during banner upload");
     } finally {
@@ -574,7 +564,7 @@ export function useSettings(onSessionExpired: () => void) {
       const filePath = banner.file_url.split("/public/media/")[1];
       if (filePath) {
         const storageRes = await storageDelete(filePath);
-        if (!storageRes.ok) console.warn("Database record deleted, but file remained in storage bucket.");
+        if (!storageRes.ok) console.warn("DB record deleted but file remained in storage.");
       }
 
       toast.success("Banner deleted successfully");
@@ -599,7 +589,7 @@ export function useSettings(onSessionExpired: () => void) {
       const dbRes = await rpc("add_media", { p_use_case: "gallery", p_media_type: "image", p_file_url: publicUrl });
 
       if (dbRes.ok) { toast.success("Image uploaded successfully!"); fetchGallery(); }
-      else throw new Error("Failed to save image details to database");
+      else throw new Error("Failed to save image to database");
     } catch (error: any) {
       toast.error(error.message || "An error occurred during gallery upload");
     } finally {
@@ -625,12 +615,29 @@ export function useSettings(onSessionExpired: () => void) {
   };
 
   return {
-    activeTab, setActiveTab, hasChanges, setHasChanges, loading, orgData, setOrgData,
-    holidays, discounts, newHoliday, setNewHoliday, newDiscount, setNewDiscount,
-    banners, bannerLoading, handleUpdateOrg, handleUpdateExchangeRate, handleAddSchedule, handleDeleteSchedule,
-    handleAddDiscount, handleDeleteDiscount, handleToggleDiscountStatus, handleLogoUpload,
-    handleBannerUpload, handleDeleteBanner, gallery, galleryLoading,
-    handleGalleryUpload, handleDeleteGalleryItem,
-    tiers, tiersLoading, handleCreateTier, handleUpdateTier, handleDeleteTier
+    activeTab, setActiveTab,
+    hasChanges, setHasChanges,
+    loading, orgData, setOrgData,
+    holidays, discounts,
+    newHoliday, setNewHoliday,
+    newDiscount, setNewDiscount,
+    banners, bannerLoading,
+    gallery, galleryLoading,
+    tiers, tiersLoading,
+    handleUpdateOrg,
+    handleUpdateExchangeRate,
+    handleAddSchedule,
+    handleDeleteSchedule,
+    handleAddDiscount,
+    handleDeleteDiscount,
+    handleToggleDiscountStatus,
+    handleLogoUpload,
+    handleBannerUpload,
+    handleDeleteBanner,
+    handleGalleryUpload,
+    handleDeleteGalleryItem,
+    handleCreateTier,
+    handleUpdateTier,
+    handleDeleteTier,
   };
 }
