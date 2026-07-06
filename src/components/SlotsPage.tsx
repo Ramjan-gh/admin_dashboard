@@ -97,7 +97,8 @@ export function SlotsPage({ onSessionExpired }: Props) {
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
-      <div className="flex justify-between items-center mb-6">
+      {/* Top Header Section: Stacks on mobile, stays clean on PC */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Slot Management</h1>
           <p className="text-gray-500 text-sm">
@@ -106,10 +107,10 @@ export function SlotsPage({ onSessionExpired }: Props) {
         </div>
         <button
           onClick={() => setAddShiftModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-500 text-white rounded-lg active:scale-95"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg active:scale-95 transition-all shadow-sm font-medium"
         >
           <Plus className="w-5 h-5" />
-          <span className="font-medium">Add New Shift</span>
+          <span>Add New Shift</span>
         </button>
       </div>
 
@@ -126,7 +127,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
         }}
       />
 
-      <div className="space-y-8 mt-6">
+      <div className="space-y-6 mt-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
@@ -136,14 +137,15 @@ export function SlotsPage({ onSessionExpired }: Props) {
           shifts.map((shift) => (
             <div
               key={shift.shift_id}
-              className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 mb-6"
+              className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100"
             >
-              <div className="flex mb-3 justify-between items-center border-b border-gray-100 pb-2">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-bold text-lg text-gray-700">
+              {/* Shift Control Strip: Wraps beautifully on mobile screens */}
+              <div className="flex flex-wrap gap-3 mb-4 justify-between items-center border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <h3 className="font-bold text-base sm:text-lg text-gray-700">
                     {shift.shift_name}
                   </h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center">
                     <button
                       onClick={() => {
                         setSelectedShiftForEdit({
@@ -152,13 +154,15 @@ export function SlotsPage({ onSessionExpired }: Props) {
                         });
                         setUpdateShiftModalOpen(true);
                       }}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md"
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
+                      title="Edit Shift"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteShift(shift.shift_id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 rounded-md"
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-50 rounded-md transition-colors"
+                      title="Delete Shift"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -169,12 +173,14 @@ export function SlotsPage({ onSessionExpired }: Props) {
                     setModalShiftId(shift.shift_id);
                     setAddSlotModalOpen(true);
                   }}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-semibold hover:bg-blue-600 hover:text-white"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-600 hover:text-white transition-all"
                 >
                   <Plus className="w-4 h-4" /> Add Slot
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+
+              {/* 🚀 THE FIXED GRID SYSTEM: Full width on tiny mobile, 2 columns on mobile layout, scales up cleanly on PC */}
+              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {slots
                   .filter((s) => s.shift_id === shift.shift_id)
                   .map((slot) => (
@@ -193,6 +199,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
         )}
       </div>
 
+      {/* Modals */}
       <UpdateShiftModal
         isOpen={updateShiftModalOpen}
         onClose={() => setUpdateShiftModalOpen(false)}
@@ -218,7 +225,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
 
       <AddShiftModal
         isOpen={addShiftModalOpen}
-        onClose={() => setAddShiftModalOpen(false)}
+        onClose={() => setAddSlotModalOpen(false)}
         onAdd={onAddShiftSubmit}
         fieldId={selectedFieldId}
         loading={isProcessing}
