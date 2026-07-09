@@ -15,16 +15,17 @@ export function TurfCard({ turf, index, onEdit, onDelete }: TurfCardProps) {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`bg-white w-96 rounded-2xl overflow-hidden border border-blue-200 shadow-sm transition-shadow ${
-            snapshot.isDragging ? "shadow-2xl ring-2 ring-blue-500 z-50" : ""
+          className={`bg-white w-80 rounded-xl overflow-hidden border border-blue-100 shadow-sm transition-shadow ${
+            snapshot.isDragging ? "shadow-xl ring-2 ring-blue-500 z-50" : ""
           }`}
         >
-          <div className="relative h-48 bg-gray-200">
+          {/* Compact Image Header */}
+          <div className="relative h-32 bg-gray-200">
             <div
               {...provided.dragHandleProps}
-              className="absolute top-3 right-3 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-lg cursor-grab active:cursor-grabbing hover:bg-white shadow-sm"
+              className="absolute top-2 right-2 z-10 p-1.5 bg-white/90 backdrop-blur-sm rounded-md cursor-grab active:cursor-grabbing hover:bg-white shadow-sm"
             >
-              <GripVertical className="w-5 h-5 text-gray-500" />
+              <GripVertical className="w-4 h-4 text-gray-500" />
             </div>
 
             <img
@@ -33,49 +34,54 @@ export function TurfCard({ turf, index, onEdit, onDelete }: TurfCardProps) {
               className="w-full h-full object-cover"
             />
 
-            <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm w-10 h-10 rounded-full flex justify-center items-center shadow-lg border border-white">
-              <span className="text-gray-900 font-bold">
+            {/* Display Order Badge */}
+            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm w-7 h-7 rounded-full flex justify-center items-center shadow-md border border-white">
+              <span className="text-gray-900 text-xs font-black">
                 {turf.display_order}
               </span>
             </div>
 
-            <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-xl flex justify-center items-center shadow-lg border border-white">
+            {/* Sport Icon Badge */}
+            <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm p-1.5 rounded-lg flex justify-center items-center shadow-md border border-white">
               <img
                 src={turf.icon_url}
-                className="w-6 h-6 object-contain"
+                className="w-5 h-5 object-contain"
                 alt="sport icon"
               />
             </div>
           </div>
 
-          <div className="p-5 space-y-4">
-            <div className="grid grid-cols-3 gap-2">
-              <StatBox label="Name" value={turf.name} color="blue" />
-              <StatBox label="Size" value={turf.size || "N/A"} color="blue" />
-              <StatBox
-                label="Cap"
-                value={turf.player_capacity || "-"}
-                color="blue"
-              />
+          {/* Card Body */}
+          <div className="p-3 space-y-2.5">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <StatBox label="Name" value={turf.name} />
+              <StatBox label="Size" value={turf.size || "N/A"} />
+              <StatBox label="Cap" value={turf.player_capacity || "-"} />
             </div>
 
-            <div className="px-4 py-2.5 w-full text-blue-500 rounded-xl text-xs text-center border border-blue-300 italic">
+            {/* Fixed Description Container (UI Defended & Readable) */}
+            <div 
+              title={turf.description || "No description provided"} 
+              className="px-3 py-1.5 w-full text-blue-600 bg-blue-50/50 rounded-lg text-[11px] leading-relaxed text-left border border-blue-100 italic cursor-help line-clamp-2"
+            >
               {turf.description || "No description provided"}
             </div>
 
-            <div className="flex gap-2 pt-2">
+            {/* Action Buttons */}
+            <div className="flex gap-1.5 pt-0.5">
               <button
                 onClick={() => onEdit(turf)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-gray-800 transition-colors shadow-sm"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
               >
-                <Edit className="w-4 h-4" />
-                <span className="text-sm font-semibold">Edit</span>
+                <Edit className="w-3.5 h-3.5" />
+                <span className="text-xs font-semibold">Edit</span>
               </button>
               <button
                 onClick={() => onDelete(turf.id)}
-                className="p-2.5 border border-red-100 text-red-500 rounded-xl hover:bg-red-50 transition-colors"
+                className="p-1.5 border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -85,27 +91,16 @@ export function TurfCard({ turf, index, onEdit, onDelete }: TurfCardProps) {
   );
 }
 
-function StatBox({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  color: string;
-}) {
-  const colors: any = {
-    blue: "border-blue-300 text-blue-400 text-blue-900",
-  };
-  const classes = colors[color].split(" ");
+// Cleaned up, bug-free StatBox component
+function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
-    <div
-      className={`text-center p-2 ${classes[0]} rounded-lg border ${classes[1]}`}
-    >
-      <p className={`text-[10px] uppercase font-black ${classes[2]}`}>
+    <div className="text-center p-1.5 rounded-md border border-blue-100 bg-blue-50/20 max-w-full overflow-hidden">
+      <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">
         {label}
       </p>
-      <p className={`text-xs font-bold ${classes[3]} truncate`}>{value}</p>
+      <p className="text-xs font-bold text-blue-900 truncate mt-0.5">
+        {value}
+      </p>
     </div>
   );
 }
