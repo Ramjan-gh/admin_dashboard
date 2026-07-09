@@ -40,18 +40,25 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
       // 2. STRICT VALIDATION PASSED
       if (isAdmin === true) {
-        // Now it's perfectly safe to commit the tokens to storage
-        localStorage.setItem("sb-access-token", accessToken);
-        if (refreshToken) {
-          localStorage.setItem("sb-refresh-token", refreshToken);
-        }
-        localStorage.setItem("sb-user", JSON.stringify({ isAdmin: true }));
-        
-        // Clear out the URL hash safely right before the redirect handshake
-        window.history.replaceState(null, "", window.location.pathname);
+  // Fetch the actual user record so Sidebar/Profile don't fall back to defaults
+  const userInfoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+    },
+  });
 
-        if (isMounted) onLoginSuccess();
-      } else {
+  const userData = userInfoRes.ok ? await userInfoRes.json() : { isAdmin: true };
+
+  localStorage.setItem("sb-access-token", accessToken);
+  if (refreshToken) {
+    localStorage.setItem("sb-refresh-token", refreshToken);
+  }
+  localStorage.setItem("sb-user", JSON.stringify(userData));
+
+  window.history.replaceState(null, "", window.location.pathname);
+  if (isMounted) onLoginSuccess();
+} else {
         // ❌ Explicit False: Clean up URL bar and reject
         window.history.replaceState(null, "", window.location.pathname);
         toast.error("Access Denied: You do not have admin permissions.");
@@ -82,7 +89,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     const currentOrigin = window.location.origin; 
     const redirectUrl = `${currentOrigin}/login`; 
     
-    const providerUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
+    const providerUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
     window.location.href = providerUrl;
   };
 
