@@ -19,43 +19,55 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
       if (isMounted) setLoading(true);
 
       try {
-        const urlParams = new URLSearchParams(hashString.substring(1));
-        const accessToken = urlParams.get("access_token");
-        const refreshToken = urlParams.get("refresh_token");
+  const urlParams = new URLSearchParams(hashString.substring(1));
+  const accessToken = urlParams.get("access_token");
+  const refreshToken = urlParams.get("refresh_token");
 
-        if (accessToken) {
-          localStorage.setItem("sb-access-token", accessToken);
-          if (refreshToken) {
-            localStorage.setItem("sb-refresh-token", refreshToken);
-          }
+  if (accessToken) {
+    // 1. Make the API request directly using the extraction variable 
+    // DO NOT write to localStorage yet!
+    const userRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/is_admin`, {
+      method: "POST", 
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+        "Content-Type": "application/json"
+      },
+    });
 
-          const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${accessToken}`,
-              "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-          });
+    if (userRes.ok) {
+      const isAdmin = await userRes.json(); 
 
-          if (userRes.ok) {
-            const userData = await userRes.json();
-            localStorage.setItem("sb-user", JSON.stringify(userData));
-            
-            // Clean up hash tokens from the browser URL address bar
-            window.history.replaceState(null, "", window.location.pathname);
-            
-            // 🚀 SUCCESS HANDSHAKE: Triggers your application's router shift
-            if (isMounted) onLoginSuccess();
-          } else {
-            toast.error("Failed to authenticate user profile session.");
-          }
+      // 2. STRICT VALIDATION PASSED
+      if (isAdmin === true) {
+        // Now it's perfectly safe to commit the tokens to storage
+        localStorage.setItem("sb-access-token", accessToken);
+        if (refreshToken) {
+          localStorage.setItem("sb-refresh-token", refreshToken);
         }
-      } catch (error) {
-        console.error("Auth routing extraction exception error:", error);
-        toast.error("An error occurred while parsing auth credentials.");
-      } finally {
-        if (isMounted) setLoading(false);
+        localStorage.setItem("sb-user", JSON.stringify({ isAdmin: true }));
+        
+        // Clear out the URL hash safely right before the redirect handshake
+        window.history.replaceState(null, "", window.location.pathname);
+
+        if (isMounted) onLoginSuccess();
+      } else {
+        // ❌ Explicit False: Clean up URL bar and reject
+        window.history.replaceState(null, "", window.location.pathname);
+        toast.error("Access Denied: You do not have admin permissions.");
       }
+    } else {
+      window.history.replaceState(null, "", window.location.pathname);
+      toast.error("Failed to verify admin status.");
+    }
+  }
+} catch (error) {
+  console.error("Auth routing extraction exception error:", error);
+  window.history.replaceState(null, "", window.location.pathname);
+  toast.error("An error occurred while parsing auth credentials.");
+} finally {
+  if (isMounted) setLoading(false);
+}
     };
 
     handleAuthCallback();
@@ -67,8 +79,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
   const handleGoogleLogin = () => {
     setLoading(true);
-    
-    // 🌍 DYNAMIC ROUTING: Detects if running on localhost or vercel automatically
     const currentOrigin = window.location.origin; 
     const redirectUrl = `${currentOrigin}/login`; 
     
