@@ -1,48 +1,79 @@
-import { useState } from "react";
-import { LogIn, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogIn } from "lucide-react";
 import { toast } from "sonner";
 
 import { LoginPageProps } from "./types";
 
-const AUTH_URL = "https://himsgwtkvewhxvmjapqa.supabase.co/auth/v1";
+const SUPABASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  useEffect(() => {
+    let isMounted = true;
 
-    try {
-      const res = await fetch(`${AUTH_URL}/token?grant_type=password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    const handleAuthCallback = async () => {
+      const hashString = window.location.hash;
+      if (!hashString || !hashString.includes("access_token=")) return;
 
-      const data = await res.json();
+      if (isMounted) setLoading(true);
 
-      if (res.ok && data.access_token) {
-        localStorage.setItem("sb-access-token", data.access_token);
-        localStorage.setItem("sb-refresh-token", data.refresh_token); // ← NEW
-        localStorage.setItem("sb-user", JSON.stringify(data.user));
-        onLoginSuccess();
-      } else {
-        toast.error(
-          data.error_description || data.message || "Invalid credentials",
-        );
+      try {
+        const urlParams = new URLSearchParams(hashString.substring(1));
+        const accessToken = urlParams.get("access_token");
+        const refreshToken = urlParams.get("refresh_token");
+
+        if (accessToken) {
+          localStorage.setItem("sb-access-token", accessToken);
+          if (refreshToken) {
+            localStorage.setItem("sb-refresh-token", refreshToken);
+          }
+
+          const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+          });
+
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            localStorage.setItem("sb-user", JSON.stringify(userData));
+            
+            // Clean up hash tokens from the browser URL address bar
+            window.history.replaceState(null, "", window.location.pathname);
+            
+            // 🚀 SUCCESS HANDSHAKE: Triggers your application's router shift
+            if (isMounted) onLoginSuccess();
+          } else {
+            toast.error("Failed to authenticate user profile session.");
+          }
+        }
+      } catch (error) {
+        console.error("Auth routing extraction exception error:", error);
+        toast.error("An error occurred while parsing auth credentials.");
+      } finally {
+        if (isMounted) setLoading(false);
       }
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    handleAuthCallback();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [onLoginSuccess]);
+
+  const handleGoogleLogin = () => {
+    setLoading(true);
+    
+    // 🌍 DYNAMIC ROUTING: Detects if running on localhost or vercel automatically
+    const currentOrigin = window.location.origin; 
+    const redirectUrl = `${currentOrigin}/login`; 
+    
+    const providerUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = providerUrl;
   };
 
   return (
@@ -52,96 +83,37 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 text-blue-600 rounded-full mb-4">
             <LogIn className="w-8 h-8" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Admin Login</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Admin Portal</h2>
           <p className="text-gray-500 mt-2">
             Access your turf management dashboard
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Email Address
-            </label>
-            <div className="relative flex items-center">
-              <div className="absolute left-3 pointer-events-none">
-                <Mail className="w-5 h-5 text-gray-400" />
-              </div>
-              <input
-                type="email"
-                required
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Password
-            </label>
-            <div className="relative flex items-center">
-              <div className="absolute left-3 pointer-events-none">
-                <Lock className="w-5 h-5 text-gray-400" />
-              </div>
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                className="w-full pl-10 pr-12 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition transform active:scale-[0.98] disabled:bg-blue-300 disabled:transform-none shadow-md"
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg
-                  className="animate-spin h-5 w-5 text-white"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Authenticating...
-              </span>
-            ) : (
-              "Sign In"
-            )}
-          </button>
-        </form>
+        <button
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-50 transition transform active:scale-[0.98] disabled:opacity-50 disabled:transform-none shadow-sm"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-gray-500" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Authenticating...
+            </span>
+          ) : (
+            <>
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.92h6.61c-.3 1.56-1.17 2.88-2.48 3.75v3.13h4.01c2.34-2.16 3.61-5.34 3.61-8.73z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-4.01-3.13c-1.12.75-2.55 1.19-3.92 1.19-3.04 0-5.63-2.06-6.55-4.83H1.31v3.23C3.29 21.57 7.37 24 12 24z" />
+                <path fill="#FBBC05" d="M5.45 14.32a7.14 7.14 0 0 1 0-4.64V6.45H1.31a12 12 0 0 0 0 11.1l4.14-3.23z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.29 2.43 1.31 6.45l4.14 3.23c.92-2.77 3.51-4.83 6.55-4.83z" />
+              </svg>
+              <span>Continue with Google</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
