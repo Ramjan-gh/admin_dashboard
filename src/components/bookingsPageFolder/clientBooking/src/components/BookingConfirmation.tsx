@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, Download, Printer, Award, Loader2 } from "lucide-react";
+import { CheckCircle, Download, Printer, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { format } from "date-fns";
 import { useLocation } from "react-router-dom";
@@ -27,23 +27,28 @@ type Organization = {
   booking_security_amount?: number;
 };
 
-export function BookingConfirmation() {
+interface BookingConfirmationProps {
+  directBookingData?: {
+    booking: any;
+    discountedTotal?: number;
+    totalPrice?: number;
+    confirmationAmount?: number;
+    sportIcon?: string;
+    sportName?: string;
+  };
+}
+
+export function BookingConfirmation({ directBookingData }: BookingConfirmationProps) {
   const location = useLocation();
-  const booking = location.state?.booking;
-  const discountedTotal =
-    location.state?.discountedTotal ?? booking?.totalPrice ?? 0;
-  const totalPrice = location.state?.totalPrice;
-  const confirmationAmount: number = location.state?.confirmationAmount;
-  const sportIcon = location.state?.sportIcon ?? " ";
-  const sportName = location.state?.sportName ?? " ";
 
-  const loyaltyDeduction = location.state?.loyaltyDeduction ?? 0;
-  const pointsRedeemed = location.state?.pointsRedeemed ?? 0;
+  // Extract from direct props first (for popup usage), then fallback to location state (for routing usage)
+  const booking = directBookingData?.booking ?? location.state?.booking;
+  const discountedTotal = directBookingData?.discountedTotal ?? location.state?.discountedTotal ?? booking?.totalPrice ?? 0;
+  const totalPrice = directBookingData?.totalPrice ?? location.state?.totalPrice ?? 0;
+  const confirmationAmount = directBookingData?.confirmationAmount ?? location.state?.confirmationAmount ?? 0;
+  const sportIcon = directBookingData?.sportIcon ?? location.state?.sportIcon ?? " ";
+  const sportName = directBookingData?.sportName ?? location.state?.sportName ?? " ";
 
-  // Get points earned from state or fallback to default logic
-  const pointsEarned = location.state?.pointsEarned ?? Math.floor(discountedTotal / 100);
-
-  // Organization info is fetched from the API only — no hardcoded/concrete data.
   const [org, setOrg] = useState<Organization | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
   const [orgError, setOrgError] = useState(false);
@@ -139,28 +144,6 @@ export function BookingConfirmation() {
           </span>
         ))}
       </motion.h1>
-
-      {/* ─── SHOW IT AFTER TITLETEXT ─── */}
-      {pointsEarned > 0 && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", delay: 0.4 }}
-          className="mb-6 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl py-3 px-8 text-center shadow-md flex items-center gap-3 print:hidden border border-amber-400"
-        >
-          <div className="bg-white/20 p-2 rounded-full">
-            <Award className="w-6 h-6 text-white animate-bounce" />
-          </div>
-          <div className="text-left">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-100">
-              Loyalty Reward Earned!
-            </p>
-            <p className="text-xl font-black leading-tight">
-              +{pointsEarned} Points Added
-            </p>
-          </div>
-        </motion.div>
-      )}
 
       {/* Main Ticket Receipt Container */}
       <div className="bg-white shadow-sm md:w-[700px] rounded-sm no-scrollbar print-area print:shadow-none border border-gray-100">
@@ -344,17 +327,7 @@ export function BookingConfirmation() {
               {booking.discountCode && (
                 <div className="flex justify-between text-sm text-green-600 font-medium">
                   <span>Discount ({booking.discountCode}):</span>
-                  <span>-৳{Number((totalPrice - (booking.discountedTotal ?? discountedTotal + loyaltyDeduction)).toFixed(1))}</span>
-                </div>
-              )}
-
-              {/* Loyalty Points Redeemed Row */}
-              {pointsRedeemed > 0 && (
-                <div className="flex justify-between text-xs text-emerald-600 font-medium bg-emerald-50/50 p-1.5 rounded border border-emerald-100/50 my-1">
-                  <span className="flex items-center gap-1">
-                    ✨ Points Redeemed ({pointsRedeemed} pts):
-                  </span>
-                  <span>-৳{Number(loyaltyDeduction.toFixed(1))}</span>
+                  <span>-৳{Number((totalPrice - (booking.discountedTotal ?? discountedTotal)).toFixed(1))}</span>
                 </div>
               )}
 

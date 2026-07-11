@@ -19,10 +19,6 @@ import { supabase } from "../lib/supabase";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
-// Message type used for popup -> main-window communication once
-// BookingSuccess.tsx finishes loading the booking inside the popup.
-const BKASH_POPUP_MESSAGE_TYPE = "BKASH_BOOKING_COMPLETE";
-
 type TierDetails = {
   id: string;
   name: string;
@@ -44,6 +40,7 @@ type LoyaltyData = {
 
 type HomePageProps = {
   currentUser: User | null;
+  onBookingComplete?: (result: any) => void;
 };
 
 type SlotData = {
@@ -56,16 +53,11 @@ type SlotData = {
   price: number;
 };
 
-export function HomePage({ currentUser }: HomePageProps) {
+export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [sports, setSports] = useState<Sport[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>("");
-
-  // Reference to the bKash popup window and a poll interval that
-  // watches whether the user closed it manually without finishing.
-  const paymentPopupRef = useRef<Window | null>(null);
-  const popupPollRef = useRef<number | null>(null);
 
   useEffect(() => {
     async function loadSports() {
@@ -111,7 +103,7 @@ export function HomePage({ currentUser }: HomePageProps) {
   const [email, setEmail] = useState("");
   const [players, setPlayers] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("bkash");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentAmount, setPaymentAmount] = useState<"confirmation" | "full">(
     "confirmation",
   );
@@ -184,7 +176,8 @@ export function HomePage({ currentUser }: HomePageProps) {
 
             const { data: tierList } = await supabase
               .from("membership_tiers")
-              .select("*");
+              .select("*")
+              .returns<TierDetails[]>();
 
             const totalEarnedPoints = memberData.total_earned_points || 0;
             const sortedTiers = (tierList || []).sort(
@@ -250,179 +243,168 @@ export function HomePage({ currentUser }: HomePageProps) {
 
   const confirmationAmount = 500;
 
-  // Cleans up the popup-closed poller if it's running.
-  const clearPopupPoll = useCallback(() => {
-    if (popupPollRef.current) {
-      window.clearInterval(popupPollRef.current);
-      popupPollRef.current = null;
-    }
-  }, []);
-
-  // Listens for the postMessage that BookingSuccess.tsx sends from
-  // inside the popup once it has fetched the completed booking.
-  // This is what lets us show the confirmation on the MAIN page
-  // without ever navigating the main tab away to bKash.
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Only trust messages from our own origin (the popup navigates
-      // back to our own /booking/success page after bKash redirects it,
-      // so this will match once it's back on our domain).
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== BKASH_POPUP_MESSAGE_TYPE) return;
-
-      clearPopupPoll();
-      paymentPopupRef.current = null;
-      toast.dismiss();
-
-      if (event.data.error) {
-        toast.error(event.data.error);
+  const handleConfirmBooking = async () => {
+    try {
+      if (selectedSlots.length === 0) {
+        toast.error("No slots selected!");
         return;
       }
 
-      navigate("/booking-confirmation", {
-        state: event.data.payload,
-      });
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [navigate, clearPopupPoll]);
-
-  // Watches whether the user manually closed the popup before finishing.
-  const watchPopupClosed = useCallback((popup: Window) => {
-    clearPopupPoll();
-    popupPollRef.current = window.setInterval(() => {
-      if (popup.closed) {
-        clearPopupPoll();
-        paymentPopupRef.current = null;
-        toast.dismiss();
-        toast.info("Payment window closed.");
+      if (!bookingSessionId) {
+        toast.error("Your session has expired. Please reselect your slots.");
+        return;
       }
-    }, 500);
-  }, [clearPopupPoll]);
 
-  const handleConfirmBooking = async () => {
-  try {
-    if (selectedSlots.length === 0) {
-      toast.error("No slots selected!");
-      return;
-    }
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
-    if (!bookingSessionId) {
-      toast.error("Your session has expired. Please reselect your slots.");
-      return;
-    }
+      toast.loading("Confirming your booking...");
 
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-
-    toast.loading("Confirming your booking...");
-
-    // Look up the member's actual `members` table id from the auth user id,
-    // since currentUser.id is the AUTH id, not necessarily the member row id
-    // that create_booking's p_member_id expects.
-    let memberId = null;
-    const authUser = localStorage.getItem("sb-user");
-    if (authUser) {
-      const authUserId = JSON.parse(authUser)?.id;
-      if (authUserId) {
-        const memberRes = await fetch(
-          `${BASE_URL}/rest/v1/rpc/get_member_by_auth_user_id?p_auth_user_id=${authUserId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: anonKey,
-              Authorization: `Bearer ${anonKey}`,
+      let memberId = null;
+      const authUser = localStorage.getItem("sb-user");
+      if (authUser) {
+        const authUserId = JSON.parse(authUser)?.id;
+        if (authUserId) {
+          const memberRes = await fetch(
+            `${BASE_URL}/rest/v1/rpc/get_member_by_auth_user_id?p_auth_user_id=${authUserId}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: anonKey,
+                Authorization: `Bearer ${anonKey}`,
+              },
             },
-          },
-        );
-        if (memberRes.ok) {
-          const memberData = await memberRes.json();
-          memberId = Array.isArray(memberData)
-            ? memberData[0]?.id
-            : memberData?.id;
+          );
+          if (memberRes.ok) {
+            const memberData = await memberRes.json();
+            memberId = Array.isArray(memberData)
+              ? memberData[0]?.id
+              : memberData?.id;
+          }
         }
       }
-    }
 
-    // Net amount owed after promo discount AND points discount.
-    const netPayable = Math.max(
-      discountedTotal - (usePoints ? pointsDiscountValue : 0),
-      0,
-    );
-    const paidAmount =
-      paymentAmount === "confirmation" ? confirmationAmount : netPayable;
+      const netPayable = Math.max(
+        discountedTotal - (usePoints ? pointsDiscountValue : 0),
+        0,
+      );
+      const paidAmount =
+        paymentAmount === "confirmation" ? confirmationAmount : netPayable;
 
-    const payload = {
-      p_field_id: selectedSport,
-      p_slot_ids: selectedSlots,
-      p_booking_date: format(selectedDate, "yyyy-MM-dd"),
-      p_member_id: memberId,
-      p_full_name: fullName,
-      p_phone_number: phone,
-      p_email: email || "",
-      p_number_of_players: players ? parseInt(players) : null,
-      p_special_notes: notes || "",
-      p_payment_method: paymentMethod,
-      p_payment_status:
-        paymentAmount === "confirmation" ? "partially_paid" : "fully_paid",
-      p_paid_amount: paidAmount,
-      p_session_id: bookingSessionId,
-      p_discount_code_id: discountData?.id || null,
-      p_loyalty_points_used: usePoints ? pointsToRedeem : 0,
-    };
+      const payload = {
+        p_field_id: selectedSport,
+        p_slot_ids: selectedSlots,
+        p_booking_date: format(selectedDate, "yyyy-MM-dd"),
+        p_member_id: memberId,
+        p_full_name: fullName,
+        p_phone_number: phone,
+        p_email: email || "",
+        p_number_of_players: players ? parseInt(players) : null,
+        p_special_notes: notes || "",
+        p_payment_method: paymentMethod,
+        p_payment_status:
+          paymentAmount === "confirmation" ? "partially_paid" : "fully_paid",
+        p_paid_amount: paidAmount,
+        p_session_id: bookingSessionId,
+        p_discount_code_id: discountData?.id || null,
+        p_loyalty_points_used: usePoints ? pointsToRedeem : 0,
+      };
 
-    const res = await fetch(`${BASE_URL}/rest/v1/rpc/create_booking`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
+      const res = await fetch(`${BASE_URL}/rest/v1/rpc/create_booking`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-    const data = await res.json();
-    toast.dismiss();
+      const rawData = await res.json();
+      console.log("create_booking raw response:", res.status, rawData);
+      toast.dismiss();
 
-    if (!res.ok || !data?.[0]?.booking_code) {
-      toast.error(data?.[0]?.message || "Booking failed. Please try again.");
-      return;
-    }
+      const result = Array.isArray(rawData) ? rawData[0] : rawData;
 
-    toast.success(data[0].message || "Booking confirmed!");
+      if (!res.ok || !result?.booking_code) {
+        toast.error(result?.message || "Booking failed. Please try again.");
+        return;
+      }
 
-    navigate("/booking-confirmation", {
-      state: {
+      toast.success(result.message || "Booking confirmed!");
+
+      const pointsEarned = Math.floor(netPayable / 100);
+
+      const newBooking: Booking = {
+        id: result.booking_id || Date.now().toString(),
+        code: result.booking_code,
+        msg: result.booking_code,
+        fullName,
+        phone,
+        email: email || undefined,
+        sport: selectedSport,
+        date: format(selectedDate, "yyyy-MM-dd"),
+        slots: selectedSlots.sort(),
+        players: players ? parseInt(players) : undefined,
+        notes: notes || undefined,
+        paymentMethod,
+        paymentAmount,
+        discountCode: discountCode || undefined,
+        totalPrice,
+        paidAmount,
+        dueAmount: Math.max(discountedTotal - paidAmount, 0),
+        createdAt: new Date().toISOString(),
+      };
+
+      const allBookings = [...bookings, newBooking];
+      localStorage.setItem("bookings", JSON.stringify(allBookings));
+      setConfirmedBooking(newBooking);
+
+      const confirmationPayload = {
         booking: {
+          code: result.booking_code,
+          createdAt: newBooking.createdAt,
           fullName,
           phone,
-          email,
-          players,
-          notes,
-          paymentMethod,
-          paymentAmount,
-          discountCode,
-          totalPrice,
-          paidAmount,
-          dueAmount: Math.max(discountedTotal - paidAmount, 0),
-          slots: slotsData.filter((s) => selectedSlots.includes(s.slot_id)),
+          email: email || undefined,
           date: format(selectedDate, "yyyy-MM-dd"),
+          players: players ? parseInt(players) : undefined,
+          paymentAmount,
+          discountCode: discountCode || undefined,
+          discountedTotal,
+          slots: slotsData.filter((s) => selectedSlots.includes(s.slot_id)),
         },
-        sportIcon: selectedSportData?.icon || "",
-        sportName: selectedSportData?.name || "",
         totalPrice,
         discountedTotal,
         confirmationAmount,
-        bookingCode: data[0].booking_code,
-      },
-    });
-  } catch (err) {
-    console.error("Booking confirmation error:", err);
-    toast.dismiss();
-    toast.error("Something went wrong while confirming your booking.");
-  }
-};
+        sportIcon: selectedSportData?.icon || "",
+        sportName: selectedSportData?.name || "",
+        loyaltyDeduction: usePoints ? pointsDiscountValue : 0,
+        pointsRedeemed: usePoints ? pointsToRedeem : 0,
+        pointsEarned,
+      };
+
+      if (onBookingComplete) {
+        onBookingComplete(confirmationPayload);
+      } else {
+        navigate("/booking-confirmation", { state: confirmationPayload });
+      }
+
+      // Reset form after navigating away / firing callback
+      setSelectedSlots([]);
+      setFullName(currentUser?.name || "");
+      setPhone(currentUser?.phone || "");
+      setEmail(currentUser?.email || "");
+      setPlayers("");
+      setNotes("");
+      setDiscountCode("");
+      setShowSummary(false);
+    } catch (err) {
+      console.error("Booking confirmation error:", err);
+      toast.dismiss();
+      toast.error("Something went wrong while confirming your booking.");
+    }
+  };
 
   const selectedSportData = sports.find((s) => s.id === selectedSport);
   const totalPrice = calculateTotal();

@@ -11,7 +11,7 @@ export type User = {
 };
 
 interface Props {
-  onBookingComplete?: () => void;
+  onBookingComplete?: (result: any) => void;
 }
 
 export default function ClientBookingWrapper({ onBookingComplete }: Props) {
@@ -26,12 +26,9 @@ export default function ClientBookingWrapper({ onBookingComplete }: Props) {
   }, []);
 
   return (
-      <div className="client-booking-scope bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
-        <HomePage
-          currentUser={currentUser}
-          onBookingComplete={onBookingComplete}
-        />
-        <Toaster />
-      </div>
-  );
+    <div className="client-booking-scope ...">
+      <HomePage currentUser={currentUser} onBookingComplete={onBookingComplete} />
+      <Toaster />
+    </div>
+);
 }
