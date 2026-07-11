@@ -1,20 +1,38 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Button } from "./ui/button";
-import { Tag, Sparkles, PartyPopper } from "lucide-react";
+import { Switch } from "./ui/switch";
+import { User as AuthUser } from "../App";
+import {
+  Tag,
+  User,
+  Phone,
+  Mail,
+  Users,
+  MessageSquare,
+  CheckCircle2,
+  ShieldCheck,
+  CreditCard,
+  Coins,
+  Sparkles,
+  CalendarDays,
+} from "lucide-react";
 
 export type DiscountResponse = {
   id: string;
-  discount_type: "percentage" | "numeric";
+  discount_type: "percentage" | "fixed";
   discount_value: number;
   message: string;
 };
 
 type PersonalInfoFormProps = {
+  currentUser: AuthUser | null;
   fullName: string;
   setFullName: (val: string) => void;
   phone: string;
@@ -27,12 +45,9 @@ type PersonalInfoFormProps = {
   setNotes: (val: string) => void;
   discountCode: string;
   setDiscountCode: (val: string) => void;
-
-  // Props from parent
   discountData: DiscountResponse | null;
   setDiscountData: (val: DiscountResponse | null) => void;
   discountedTotal: number;
-
   paymentMethod: string;
   setPaymentMethod: (val: string) => void;
   paymentAmount: "confirmation" | "full";
@@ -41,9 +56,29 @@ type PersonalInfoFormProps = {
   totalPrice: number;
   handleShowSummary: (e: React.FormEvent) => void;
   personalInfoRef: React.RefObject<HTMLDivElement | null>;
+
+  // Synchronized States with Parent
+  usablePoints?: number;
+  pointExchangeRate?: number;
+  usePoints: boolean;
+  setUsePoints: (val: boolean) => void;
+  onApplyPointsDiscount?: (
+    pointsApplied: number,
+    cashDiscountValue: number,
+  ) => void;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  minTotalForDepositOption?: number;
+
+  // Controlled points properties from parent context
+  pointsToRedeem: number;
+  pointsDiscountValue: number;
+  setPointsToRedeem: React.Dispatch<React.SetStateAction<number>>;
+  setPointsDiscountValue: React.Dispatch<React.SetStateAction<number>>;
 };
 
 export function PersonalInfoForm({
+  currentUser,
   fullName,
   setFullName,
   phone,
@@ -59,7 +94,6 @@ export function PersonalInfoForm({
   discountData,
   setDiscountData,
   discountedTotal,
-
   paymentMethod,
   setPaymentMethod,
   paymentAmount,
@@ -68,19 +102,226 @@ export function PersonalInfoForm({
   totalPrice,
   handleShowSummary,
   personalInfoRef,
+  usablePoints = 0,
+  usePoints,
+  setUsePoints,
+  onApplyPointsDiscount,
+  supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL ||
+  "https://himsgwtkvewhxvmjapqa.supabase.co",
+  supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || "",
+  minTotalForDepositOption = 500,
+  pointsToRedeem,
+  pointsDiscountValue,
+  setPointsToRedeem,
+  setPointsDiscountValue,
 }: PersonalInfoFormProps) {
-  // Form validation
-  const isFullNameValid = /^[A-Za-z\s]+$/.test(fullName);
-  const isPhoneValid = /^01\d{9}$/.test(phone);
+  const [loadingDiscount, setLoadingDiscount] = useState(false);
+  const [isDiscountValid, setIsDiscountValid] = useState(false);
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  // Ref to prevent initial profile sync from overwriting manual changes on re-renders
+  const isProfileSyncedRef = useRef(false);
+
+  // Internal state for dynamically loaded organization points conversion rule
+  const [dynamicPointsExchangeRate, setDynamicPointsExchangeRate] = useState<number>(1);
+
+  const isLoggedIn = !!currentUser;
+  const isSlotSelected = totalPrice > 0;
+
+  const handleBlur = (field: string) => {
+    setTouchedFields((prev) => ({ ...prev, [field]: true }));
+  };
+
+  // Fetch points exchange rate from get_organization RPC directly on load
+  useEffect(() => {
+    async function fetchExchangeRate() {
+      try {
+        const res = await fetch(`${supabaseUrl}/rest/v1/rpc/get_organization`, {
+          method: "POST", // RPC execution standard requires POST mapping structures
+          headers: {
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        console.log("Fetched organization settings for points exchange rate:", data);
+
+        const orgSettings = Array.isArray(data) ? data[0] : data;
+        if (orgSettings && typeof orgSettings.points_exchange_rate === "number") {
+          setDynamicPointsExchangeRate(orgSettings.points_exchange_rate);
+        }
+      } catch (err) {
+        console.error("Failed fetching organizational live point conversion rates:", err);
+      }
+    }
+    fetchExchangeRate();
+  }, [supabaseUrl, supabaseAnonKey]);
+
+  // Sync profile data dynamically *only* when the user logs in initially.
+  // Uses the same get_member_by_auth_user_id RPC as the Header so the
+  // auto-filled name matches the authoritative member record, not just
+  // whatever was cached on the auth/session object.
+  useEffect(() => {
+    if (currentUser) {
+      if (!isProfileSyncedRef.current) {
+        // Set fallback values immediately so the form isn't empty while we fetch
+        setFullName(currentUser.name || "");
+        setPhone(currentUser.phone || "");
+        if (currentUser.email) {
+          setEmail(currentUser.email);
+        }
+        isProfileSyncedRef.current = true;
+
+        const fetchMemberProfile = async () => {
+          try {
+            const res = await fetch(
+              `${supabaseUrl}/rest/v1/rpc/get_member_by_auth_user_id`,
+              {
+                method: "POST",
+                headers: {
+                  apikey: supabaseAnonKey,
+                  Authorization: `Bearer ${supabaseAnonKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ p_auth_user_id: currentUser.id }),
+              },
+            );
+            const data = await res.json();
+            console.log("Member lookup raw response (PersonalInfoForm):", data);
+
+            // Handle both possible shapes: a single object, or an array of rows
+            const record = Array.isArray(data) ? data[0] : data;
+
+            if (record?.full_name) {
+              setFullName(record.full_name);
+            }
+            if (record?.phone) {
+              setPhone(record.phone);
+            }
+            if (record?.email) {
+              setEmail(record.email);
+            }
+          } catch (err) {
+            console.error(
+              "Failed to fetch member profile for booking form:",
+              err,
+            );
+          }
+        };
+
+        if (currentUser.id) {
+          fetchMemberProfile();
+        }
+      }
+    } else {
+      setFullName("");
+      setPhone("");
+      setEmail("");
+      setUsePoints(false);
+      setPointsToRedeem(0);
+      isProfileSyncedRef.current = false;
+    }
+  }, [
+    currentUser,
+    setFullName,
+    setPhone,
+    setEmail,
+    setUsePoints,
+    setPointsToRedeem,
+    supabaseUrl,
+    supabaseAnonKey,
+  ]);
+
+  // Handle numerical input updates for manual reward balance typing
+  const handlePointsInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isSlotSelected) return;
+
+    const valueStr = e.target.value.replace(/^0+/, "");
+    if (valueStr === "") {
+      setPointsToRedeem(0);
+      setPointsDiscountValue(0);
+      return;
+    }
+
+    const parsedPoints = parseInt(valueStr, 10);
+    if (isNaN(parsedPoints) || parsedPoints < 0) return;
+
+    let verifiedPoints = Math.min(parsedPoints, usablePoints);
+
+    const maxPointsNeeded = Math.ceil(discountedTotal / dynamicPointsExchangeRate);
+    if (verifiedPoints > maxPointsNeeded) {
+      verifiedPoints = maxPointsNeeded;
+    }
+
+    setPointsToRedeem(verifiedPoints);
+    setPointsDiscountValue(verifiedPoints / dynamicPointsExchangeRate);
+  };
+
+  const handleToggleChange = (checked: boolean) => {
+    setUsePoints(checked);
+    if (!checked) {
+      setPointsToRedeem(0);
+      setPointsDiscountValue(0);
+    }
+  };
+
+  const finalPayableTotal = useMemo(() => {
+    return Math.max(discountedTotal - pointsDiscountValue, 0);
+  }, [discountedTotal, pointsDiscountValue]);
+
+  const calculatedPromoDiscountValue = useMemo(() => {
+    if (!discountData) return 0;
+    return discountData.discount_type === "percentage"
+      ? (discountData.discount_value * totalPrice) / 100
+      : discountData.discount_value;
+  }, [discountData, totalPrice]);
+
+  const onApplyPointsDiscountRef = useRef(onApplyPointsDiscount);
+  useEffect(() => {
+    onApplyPointsDiscountRef.current = onApplyPointsDiscount;
+  }, [onApplyPointsDiscount]);
+
+  useEffect(() => {
+    if (onApplyPointsDiscountRef.current) {
+      onApplyPointsDiscountRef.current(
+        usePoints ? pointsToRedeem : 0,
+        usePoints ? pointsDiscountValue : 0,
+      );
+    }
+  }, [usePoints, pointsToRedeem, pointsDiscountValue]);
+
+  // Field Validations
+  const isFullNameValid = /^[A-Za-z\s.]{3,}$/.test(fullName);
+  const isPhoneValid = /^(?:\+88)?01\d{9}$/.test(phone);
   const isEmailValid = email === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isFormValid =
-    isFullNameValid && isPhoneValid && isEmailValid && totalPrice !== 0;
+    isFullNameValid &&
+    isPhoneValid &&
+    isEmailValid &&
+    totalPrice !== 0 &&
+    paymentMethod !== "";
 
-  // Discount UI state
-  const [isDiscountValid, setIsDiscountValid] = useState(false);
-  const [loadingDiscount, setLoadingDiscount] = useState(false);
+  const missingFields = [
+    !isFullNameValid && touchedFields.fullName && "Full name (min 3 letters)",
+    !isPhoneValid &&
+    touchedFields.phone &&
+    "Phone number (11 digits or 14 digits starting with +88)",
+    paymentMethod === "" &&
+    touchedFields.paymentMethod &&
+    "Payment method selection required",
+    totalPrice === 0 && "A time slot must be selected",
+  ].filter(Boolean) as string[];
 
-  // Validate discount via API with debounce
+  const completionPercentage = useMemo(() => {
+    const fields = [isFullNameValid, isPhoneValid, paymentMethod !== ""];
+    const completed = fields.filter(Boolean).length;
+    return Math.round((completed / fields.length) * 100);
+  }, [isFullNameValid, isPhoneValid, paymentMethod]);
+
+  // Dynamic Discount Validation via Debounce Loop
   useEffect(() => {
     if (!discountCode) {
       setDiscountData(null);
@@ -88,24 +329,21 @@ export function PersonalInfoForm({
       return;
     }
 
-    const Base_Url = "https://himsgwtkvewhxvmjapqa.supabase.co";
-
+    const controller = new AbortController();
     const timeout = setTimeout(async () => {
       setLoadingDiscount(true);
       try {
         const res = await fetch(
-          `${Base_Url}/rest/v1/rpc/validate_discount_code?p_code=${discountCode}`,
+          `${supabaseUrl}/rest/v1/rpc/validate_discount_code?p_code=${discountCode}`,
           {
             method: "GET",
+            signal: controller.signal,
             headers: {
-              apikey: (import.meta as any).env.VITE_SUPABASE_ANON_KEY || "",
-              Authorization: `Bearer ${
-                (import.meta as any).env.VITE_SUPABASE_ANON_KEY || ""
-              }`,
+              apikey: supabaseAnonKey,
+              Authorization: `Bearer ${supabaseAnonKey}`,
             },
-          }
+          },
         );
-
         const data: DiscountResponse[] = await res.json();
         if (data.length > 0 && data[0].message === "VALID") {
           setDiscountData(data[0]);
@@ -115,257 +353,497 @@ export function PersonalInfoForm({
           setIsDiscountValid(false);
         }
       } catch (err) {
-        console.error("Discount validation error:", err);
-        setDiscountData(null);
-        setIsDiscountValid(false);
+        if ((err as Error).name !== "AbortError") {
+          setIsDiscountValid(false);
+        }
       } finally {
         setLoadingDiscount(false);
       }
-    }, 500);
+    }, 600);
 
-    return () => clearTimeout(timeout);
-  }, [discountCode, setDiscountData]);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [discountCode, setDiscountData, supabaseUrl, supabaseAnonKey]);
+
+  const plans = useMemo(() => {
+    return [
+      {
+        id: "confirmation",
+        title: "Security Deposit",
+        amount: confirmationAmount,
+        icon: ShieldCheck,
+        desc: "Pay minimum to lock down field booking slot",
+      },
+      {
+        id: "full",
+        title: "Full Payment",
+        amount: finalPayableTotal,
+        icon: CreditCard,
+        desc: "Clear total statement outstanding now",
+      },
+    ].filter((plan) => {
+      if (plan.id === "confirmation") {
+        return finalPayableTotal > minTotalForDepositOption;
+      }
+      return true;
+    });
+  }, [confirmationAmount, finalPayableTotal, minTotalForDepositOption]);
 
   return (
     <motion.div
       ref={personalInfoRef}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2 }}
-      className="scroll-mt-20"
+      initial={{ opacity: 0, scale: 0.95 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      className="scroll-mt-20 max-w-screen-md mx-auto w-full md:px-4"
     >
-      <form
-        onSubmit={handleShowSummary}
-        className="bg-white rounded-3xl p-8 shadow-lg border-2 border-indigo-200 space-y-6"
-      >
-        <h2 className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-          Personal Information
-        </h2>
+      <div className="bg-white rounded-lg drop-shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-gray-50/80 p-6 border-b flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-black text-gray-800 tracking-tight">
+              Personal Details
+            </h2>
+            <p className="text-gray-500 text-sm font-medium">
+              {isLoggedIn
+                ? "Your information has been synced. You can edit it if needed."
+                : "Almost there! Just a few more bits of info."}
+            </p>
+          </div>
 
-        {/* Full Name */}
-        <div className="space-y-2">
-          <Label htmlFor="fullName">Full Name *</Label>
-          <Input
-            id="fullName"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Enter your full name"
-          />
-        </div>
-
-        {/* Phone */}
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone *</Label>
-          <Input
-            id="phone"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="01XXXXXXXXX"
-          />
-        </div>
-
-        {/* Email */}
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-          />
-        </div>
-
-        {/* Players */}
-        <div className="space-y-2">
-          <Label htmlFor="players">Number of Players</Label>
-          <Input
-            id="players"
-            value={players}
-            onChange={(e) => setPlayers(e.target.value)}
-            placeholder="Optional"
-          />
-        </div>
-
-        {/* Notes */}
-        <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
-          <Textarea
-            id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any special notes?"
-          />
-        </div>
-
-        {/* Discount Code */}
-        <div className="space-y-2">
-          <Label htmlFor="discount" className="flex items-center gap-2">
-            <Tag className="w-4 h-4 text-indigo-600" />
-            Discount Code
-          </Label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Input
-                id="discount"
-                type="text"
-                placeholder="Enter promo code"
-                value={discountCode}
-                onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                className={`border-2 caret-black text-black placeholder:text-gray-500 ${
-                  isDiscountValid ? "border-green-500 bg-green-50" : ""
-                }`}
+          <div className="relative h-16 w-16">
+            <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+              <circle
+                cx="18"
+                cy="18"
+                r="16"
+                fill="none"
+                className="stroke-gray-200"
+                strokeWidth="4"
               />
-              <AnimatePresence>
-                {isDiscountValid && discountData && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    exit={{ scale: 0 }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
-                  >
-                    <PartyPopper className="w-5 h-5 text-green-600" />
+              <motion.circle
+                cx="18"
+                cy="18"
+                r="16"
+                fill="none"
+                className="stroke-green-600"
+                strokeWidth="4"
+                strokeDasharray="100"
+                initial={{ strokeDashoffset: 100 }}
+                animate={{ strokeDashoffset: 100 - completionPercentage }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-green-900">
+              {completionPercentage}%
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleShowSummary} className="p-8 space-y-8">
+          {isLoggedIn && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold">
+              🎉 Authenticated User: {currentUser?.name}. Details loaded automatically and remain editable.
+            </div>
+          )}
+
+          {/* Form Fields Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Name Input */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="flex items-center gap-2 text-gray-600 font-bold">
+                  <User className="w-4 h-4" /> Full Name *
+                </Label>
+                {isFullNameValid && (
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
                   </motion.div>
                 )}
-              </AnimatePresence>
+              </div>
+              <Input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                onBlur={() => handleBlur("fullName")}
+                placeholder="Ex: John Doe"
+                className={`rounded-xl border-2 text-black focus-visible:ring-green-500 ${touchedFields.fullName && !isFullNameValid
+                    ? "border-rose-400 focus-visible:ring-rose-400"
+                    : "border-gray-200"
+                  }`}
+              />
             </div>
 
-            {isDiscountValid && discountData && (
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Valid (
-                  {discountData.discount_value}
-                  {discountData.discount_type === "percentage" ? "%" : "৳"})
+            {/* Phone Input */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label className="flex items-center gap-2 text-gray-600 font-bold">
+                  <Phone className="w-4 h-4" /> Phone Number *
+                </Label>
+                {isPhoneValid && (
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  </motion.div>
+                )}
+              </div>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onBlur={() => handleBlur("phone")}
+                placeholder="01XXXXXXXXX"
+                className={`rounded-xl border-2 text-black focus-visible:ring-green-500 ${touchedFields.phone && !isPhoneValid
+                    ? "border-rose-400 focus-visible:ring-rose-400"
+                    : "border-gray-200"
+                  }`}
+              />
+            </div>
+
+            {/* Email Input */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-gray-600 font-bold">
+                <Mail className="w-4 h-4" /> Email (Optional)
+              </Label>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => handleBlur("email")}
+                placeholder="hello@example.com"
+                className={`rounded-xl border-2 text-black focus-visible:ring-green-500 ${touchedFields.email && !isEmailValid
+                    ? "border-rose-400 focus-visible:ring-rose-400"
+                    : "border-gray-200"
+                  }`}
+              />
+            </div>
+
+            {/* Players Input */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-gray-600 font-bold">
+                <Users className="w-4 h-4" /> Player Count
+              </Label>
+              <Input
+                value={players}
+                onChange={(e) => setPlayers(e.target.value)}
+                placeholder="How many people?"
+                className="rounded-xl border-2 text-black focus-visible:ring-green-500 border-gray-200"
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-gray-600 font-bold">
+              <MessageSquare className="w-4 h-4" /> Special Note
+            </Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Tell us anything we should know..."
+              className="rounded-xl border-2 min-h-[100px] text-black focus-visible:ring-green-500 border-gray-200"
+            />
+          </div>
+
+          {/* Numerical Input Loyalty Engine Panel */}
+          <AnimatePresence>
+            {isLoggedIn && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-emerald-50/60 p-5 rounded-2xl border-2 border-emerald-100 flex flex-col space-y-4 overflow-hidden"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 bg-emerald-500 rounded-xl text-white mt-0.5">
+                      <Coins className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-emerald-900 flex items-center gap-1.5">
+                        Redeem Member Points
+                      </h4>
+                      <p className="text-xs text-emerald-700/80 mt-0.5 font-medium">
+                        Available:{" "}
+                        <span className="font-bold text-emerald-800">
+                          {usablePoints}
+                        </span>{" "}
+                        points
+                        {usablePoints > 0 &&
+                          ` (Worth ৳${usablePoints * dynamicPointsExchangeRate})`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-xl border border-emerald-200/60 self-start sm:self-center">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Apply Points
+                    </span>
+                    <Switch
+                      checked={usePoints}
+                      disabled={usablePoints <= 0}
+                      onCheckedChange={handleToggleChange}
+                      className="bg-gray-200 border border-gray-300 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-700"
+                    />
+                  </div>
                 </div>
+
+                {/* Smooth Expansion of the Numeric Typing Input Field or Prompt Warning */}
+                <AnimatePresence mode="wait">
+                  {usePoints && usablePoints > 0 && (
+                    <motion.div
+                      key={isSlotSelected ? "slot-selected" : "slot-missing"}
+                      initial={{ opacity: 0, y: -10, height: 0 }}
+                      animate={{ opacity: 1, y: 0, height: "auto" }}
+                      exit={{ opacity: 0, y: -10, height: 0 }}
+                      className="pt-3 border-t border-emerald-200/40 space-y-2 overflow-hidden"
+                    >
+                      {isSlotSelected ? (
+                        <>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <Label
+                              htmlFor="pointsInput"
+                              className="text-xs font-bold text-emerald-900"
+                            >
+                              Enter points amount to use:
+                            </Label>
+                            {pointsToRedeem > 0 && (
+                              <span className="text-xs text-emerald-700 font-medium">
+                                Using {pointsToRedeem} points ={" "}
+                                <span className="font-bold">
+                                  ৳{pointsDiscountValue} Discount
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative max-w-xs">
+                            <Input
+                              id="pointsInput"
+                              type="number"
+                              min="0"
+                              max={usablePoints}
+                              value={pointsToRedeem || ""}
+                              onChange={handlePointsInputChange}
+                              placeholder="e.g. 50"
+                              className="rounded-xl border-2 border-emerald-200 bg-white text-black font-semibold focus-visible:ring-emerald-500 pr-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <div className="absolute right-3 flex top-[26px] -translate-y-1/2 text-xs font-bold text-emerald-600 pointer-events-none">
+                              / {usablePoints}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <motion.div
+                          initial={{ scale: 0.95, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-xs font-medium"
+                        >
+                          <CalendarDays className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                          <span>Please select an available field time slot above first to calculate and apply your member points discount.</span>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
+          </AnimatePresence>
+
+          {/* Promo Code Code Block */}
+          <div className="bg-indigo-50/50 p-6 rounded-2xl border-2 border-dashed border-indigo-200 space-y-4">
+            <Label className="flex items-center gap-2 text-gray-700 font-black">
+              <Tag className="w-5 h-5" /> Promo Code
+            </Label>
+            <div className="relative">
+              <Input
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                placeholder={
+                  loadingDiscount ? "Verifying..." : "Enter code here..."
+                }
+                className={`rounded-xl border-2 pr-12 transition-all bg-white text-black text-base tracking-wide ${isDiscountValid
+                    ? "ring-2 ring-green-500 border-green-500"
+                    : "border-gray-200"
+                  }`}
+              />
+            </div>
+            <AnimatePresence>
+              {isDiscountValid && discountData && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="bg-green-900 text-white p-4 rounded-xl shadow-lg flex justify-between items-center overflow-hidden"
+                >
+                  <span className="font-bold">Code Applied!</span>
+                  <span className="font-bold text-lg">
+                    -৳{calculatedPromoDiscountValue}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {!isDiscountValid && discountCode && !loadingDiscount && (
-            <p className="text-red-500 text-sm">Invalid discount code.</p>
-          )}
+          {/* Payment Section */}
+          <div className="space-y-6 pt-4 border-t-2 border-dashed">
+            <h3 className="text-xl font-black text-gray-800">
+              Payment Details
+            </h3>
 
-          {isDiscountValid && discountData && (
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-              <div className="flex flex-col gap-2">
-                <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-lg">
-                  <Sparkles className="w-3 h-3 inline-block" /> You have got{" "}
-                  {discountData.discount_type === "percentage"
-                    ? (discountData.discount_value * totalPrice) / 100
-                    : discountData.discount_value}
-                  ৳ discount.
+            <div className="space-y-2">
+              <Label className="font-bold text-gray-600">
+                Payment Method *
+              </Label>
+              <RadioGroup
+                value={paymentMethod}
+                onValueChange={(val) => {
+                  setPaymentMethod(val);
+                  handleBlur("paymentMethod");
+                }}
+              >
+                <div className="grid grid-cols-1">
+                  <div
+                    className={`flex items-center justify-center p-4 rounded-xl border-2 transition-all ${paymentMethod === "cash"
+                        ? "border-green-500 bg-green-50 ring-4 ring-green-50"
+                        : "border-gray-100 bg-white"
+                      }`}
+                  >
+                    <RadioGroupItem
+                      value="cash"
+                      id="cash"
+                      className="sr-only"
+                    />
+                    <Label
+                      htmlFor="cash"
+                      className="cursor-pointer text-center w-full font-black text-lg text-green-700"
+                    >
+                      Cash
+                    </Label>
+                  </div>
                 </div>
-                <div className="bg-gray-900 text-gray-100 px-4 py-2 rounded-lg">
-                  <Sparkles className="w-3 h-3 inline-block" /> Total after
-                  discount: {Math.max(discountedTotal, 0)} ৳
-                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label className="font-bold text-gray-600">Select Plan *</Label>
+                {usePoints && pointsDiscountValue > 0 && (
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> Points Applied: -৳
+                    {pointsDiscountValue}
+                  </span>
+                )}
               </div>
+              <RadioGroup
+                value={paymentAmount}
+                onValueChange={(val) => setPaymentAmount(val as any)}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {plans.map((plan) => (
+                    <label
+                      key={plan.id}
+                      className={`relative group cursor-pointer flex flex-col p-5 rounded-2xl border-2 transition-all duration-300 ${paymentAmount === plan.id
+                          ? "border-green-600 bg-green-50/50 ring-4 ring-green-50 scale-[1.02]"
+                          : "border-gray-100 hover:border-gray-300 bg-white"
+                        }`}
+                    >
+                      <RadioGroupItem value={plan.id} className="sr-only" />
+                      <div className="flex justify-between items-start mb-4">
+                        <div
+                          className={`p-2 rounded-lg ${paymentAmount === plan.id
+                              ? "bg-green-600 text-white"
+                              : "bg-gray-100 text-gray-400"
+                            }`}
+                        >
+                          <plan.icon className="w-5 h-5" />
+                        </div>
+                        {paymentAmount === plan.id && (
+                          <motion.div
+                            layoutId="payment-active"
+                            className="bg-green-600 h-2 w-2 rounded-full"
+                          />
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs font-bold uppercase tracking-wider ${paymentAmount === plan.id
+                            ? "text-green-600"
+                            : "text-gray-400"
+                          }`}
+                      >
+                        {plan.title}
+                      </span>
+                      <span className="text-2xl font-black text-gray-900 mt-1">
+                        ৳{plan.amount}
+                      </span>
+                      <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                        {plan.desc}
+                      </p>
+                    </label>
+                  ))}
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+
+          {/* Error Message Displayer */}
+          {!isFormValid && missingFields.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-4 space-y-2"
+            >
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                To continue, please complete:
+              </p>
+              {missingFields.map((field) => (
+                <div
+                  key={field}
+                  className="flex items-center gap-2 text-sm text-gray-700"
+                >
+                  <span className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                  {field}
+                </div>
+              ))}
             </motion.div>
           )}
-        </div>
 
-        {/* Payment Section */}
-        <div className="space-y-4 pt-4 border-t-2 border-dashed">
-          <h3 className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Payment Details
-          </h3>
-
-          {/* Payment Method */}
-          <div className="space-y-2">
-            <Label>Payment Method *</Label>
-            <RadioGroup
-              value={paymentMethod}
-              onValueChange={(val: string) => setPaymentMethod(val)}
-            >
-              <div className="grid grid-cols-1 gap-3">
-                <div
-                  className={`flex items-center justify-center p-4 rounded-xl border-2 ${
-                    paymentMethod === "cash"
-                      ? "border-pink-500 bg-pink-50"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <RadioGroupItem
-                    value="cash"
-                    id="cash"
-                    className="sr-only"
-                  />
-                  <Label
-                    htmlFor="cash"
-                    className="cursor-pointer text-center w-full"
-                  >
-                    Cash
-                  </Label>
-                </div>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* Payment Amount */}
-          <div className="space-y-2">
-            <Label>Payment Amount *</Label>
-            <RadioGroup
-              value={paymentAmount}
-              onValueChange={(val: string) =>
-                setPaymentAmount(val as "confirmation" | "full")
-              }
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <div
-                  className={`flex items-center justify-center p-4 rounded-xl border-2 ${
-                    paymentAmount === "confirmation"
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <RadioGroupItem
-                    value="confirmation"
-                    id="confirmation"
-                    className="sr-only"
-                  />
-                  <Label
-                    htmlFor="confirmation"
-                    className="cursor-pointer text-center w-full"
-                  >
-                    Confirmation (৳{confirmationAmount})
-                  </Label>
-                </div>
-
-                <div
-                  className={`flex items-center justify-center p-4 rounded-xl border-2 ${
-                    paymentAmount === "full"
-                      ? "border-green-500 bg-green-50"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <RadioGroupItem value="full" id="full" className="sr-only" />
-                  <Label
-                    htmlFor="full"
-                    className="cursor-pointer text-center w-full"
-                  >
-                    Full Payment (৳{Math.max(discountedTotal, 0)})
-                  </Label>
-                </div>
-              </div>
-            </RadioGroup>
-          </div>
-        </div>
-
-        {/* Submit Button */}
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button
-            type="submit"
-            disabled={!isFormValid}
-            className={`w-full py-6 shadow-lg text-white ${
-              isFormValid
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600"
-                : "bg-gray-400"
-            }`}
+          {/* Action Trigger Button */}
+          <motion.div
+            whileHover={isFormValid ? { scale: 1.01 } : {}}
+            whileTap={isFormValid ? { scale: 0.99 } : {}}
+            className="pt-4"
           >
-            <Sparkles className="w-5 h-5 mr-2" />
-            Review Booking
-          </Button>
-        </motion.div>
-      </form>
+            <Button
+              type="submit"
+              disabled={!isFormValid}
+              className={`relative overflow-hidden w-full py-8 rounded-2xl text-xl font-black shadow-md transition-all duration-300 ${isFormValid
+                  ? "bg-green-900 text-white opacity-100 cursor-pointer"
+                  : "bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed"
+                }`}
+            >
+              {isFormValid && (
+                <motion.div
+                  className="absolute inset-0"
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 2,
+                    ease: "linear",
+                    repeatDelay: 1,
+                  }}
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                    skewX: "-25deg",
+                  }}
+                />
+              )}
+              <div className="relative z-10 flex items-center justify-center gap-3 text-base md:text-2xl tracking-wide font-black">
+                {isFormValid ? "REVIEW MY BOOKING" : "PLEASE COMPLETE FORM"}
+              </div>
+            </Button>
+          </motion.div>
+        </form>
+      </div>
     </motion.div>
   );
 }

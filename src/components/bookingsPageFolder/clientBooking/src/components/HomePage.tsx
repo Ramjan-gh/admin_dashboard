@@ -1,17 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { User, Booking } from "../App";
 import { Calendar } from "./ui/calendar";
 import { useNavigate } from "react-router-dom";
-
-import {
-  Calendar as CalendarIcon,
-  Check,
-  Clock,
-  ChevronDown,
-} from "lucide-react";
-// import { BookingModal } from "./BookingModal";
-import { format, parse, startOfDay, isSameDay } from "date-fns";
-import { motion } from "framer-motion";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 import SportSelector from "./SportSelector";
 import { Sport } from "../data/sports";
@@ -21,62 +14,104 @@ import { PersonalInfoForm } from "./PersonalInfoForm";
 import { SummarySection } from "./SummarySection";
 import { DiscountResponse } from "./PersonalInfoForm";
 import Footer from "./Footer";
+import { BookingProgressSidebar } from "./Booingprogresssidebar";
+import { supabase } from "../lib/supabase";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
-type HomePageProps = {
-  currentUser: User | null;
-  onBookingComplete?: () => void; 
+// Message type used for popup -> main-window communication once
+// BookingSuccess.tsx finishes loading the booking inside the popup.
+const BKASH_POPUP_MESSAGE_TYPE = "BKASH_BOOKING_COMPLETE";
+
+type TierDetails = {
+  id: string;
+  name: string;
+  min_points: number;
+  badge_color: string;
+  description: string;
+  reward_interval: number | null;
+  points_multiplier: number;
+  discount_percentage: number;
 };
 
-export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
+type LoyaltyData = {
+  all_tiers: TierDetails[];
+  current_tier: TierDetails | null;
+  next_tier: TierDetails | null;
+  points_to_next_tier: number;
+  total_earned_points: number;
+};
+
+type HomePageProps = {
+  currentUser: User | null;
+};
+
+type SlotData = {
+  slot_id: string;
+  field_id: string;
+  start_time: string;
+  end_time: string;
+  type: string;
+  status: "booked" | "available" | "held" | "maintenance";
+  price: number;
+};
+
+export function HomePage({ currentUser }: HomePageProps) {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [sports, setSports] = useState<Sport[]>([]);
   const [selectedSport, setSelectedSport] = useState<string>("");
 
+  // Reference to the bKash popup window and a poll interval that
+  // watches whether the user closed it manually without finishing.
+  const paymentPopupRef = useRef<Window | null>(null);
+  const popupPollRef = useRef<number | null>(null);
+
   useEffect(() => {
     async function loadSports() {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_fields`, {
-        method: "GET",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!res.ok) throw new Error("Failed to fetch fields");
-      const data = await res.json();
-
-      const formatted = data.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        image: item.background_image_url, // mapping
-        icon: item.icon_url || "⚽",
-      }));
-
-      setSports(formatted);
-      // Set default sport (first in the list)
-      if (formatted.length > 0) {
-        setSelectedSport((prev) => (prev === "" ? formatted[0].id : prev));
+      try {
+        const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_fields`, {
+          method: "GET",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!res.ok) throw new Error("Failed to fetch fields");
+        const data = await res.json();
+        const formatted = data.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          image: item.background_image_url,
+          icon: item.icon_url || "⚽",
+          size: item.size || "N/A",
+          player_capacity: item.player_capacity || 0,
+        }));
+        setSports(formatted);
+        if (formatted.length > 0) {
+          setSelectedSport((prev) => (prev === "" ? formatted[0].id : prev));
+        }
+      } catch (err) {
+        console.error("Error loading fields:", err);
       }
     }
-
     loadSports();
   }, []);
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [slotsData, setSlotsData] = useState<SlotData[]>([]);
 
-  // Form states
+  // Shared session id for the current booking attempt.
+  const [bookingSessionId, setBookingSessionId] = useState<string>("");
+
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [players, setPlayers] = useState("");
   const [notes, setNotes] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethod, setPaymentMethod] = useState("bkash");
   const [paymentAmount, setPaymentAmount] = useState<"confirmation" | "full">(
     "confirmation",
   );
@@ -85,82 +120,25 @@ export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
     null,
   );
   const [discountedTotal, setDiscountedTotal] = useState(0);
-
-  // View states
   const [showSummary, setShowSummary] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(
     null,
   );
+  const [usablePoints, setUsablePoints] = useState(0);
+  const [loyalty, setLoyalty] = useState<LoyaltyData | null>(null);
 
-  // state to store slot data
-  const [slotsData, setSlotsData] = useState<
-    {
-      slot_id: string;
-      start_time: string;
-      end_time: string;
-      price: number;
-      status: string;
-    }[]
-  >([]);
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [pointsDiscountValue, setPointsDiscountValue] = useState(0);
 
-  // fetch slot
-  useEffect(() => {
-    if (!selectedSport) return;
+  const handleSetSlotsData = useCallback((slots: SlotData[]) => {
+    setSlotsData(slots);
+  }, []);
 
-    async function loadSlots() {
-      try {
-        const res = await fetch(
-          `${BASE_URL}/rest/v1/rpc/get_slots?p_field_id=${selectedSport}&p_booking_date=${format(
-            selectedDate,
-            "yyyy-MM-dd",
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-              Authorization: `Bearer ${
-                import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-              }`,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        if (!res.ok) throw new Error("Failed to fetch slots");
-
-        const data = await res.json();
-        console.log("API response:", data);
-
-        // Flatten slots from shifts
-        const formattedSlots = data.flatMap((shift: any) =>
-          shift.slots.map((slot: any) => ({
-            slot_id: slot.slot_id,
-            start_time: slot.start_time,
-            end_time: slot.end_time,
-            price: Number(slot.price),
-            status: slot.status,
-            shift_name: shift.shift_name,
-            duration_minutes: slot.duration_minutes,
-          })),
-        );
-
-        console.log("Formatted slots:", formattedSlots);
-        setSlotsData(formattedSlots);
-      } catch (error) {
-        console.error(error);
-        toast.error("Failed to load slots");
-      }
-    }
-
-    loadSlots();
-  }, [selectedSport, selectedDate]);
-
-  // When slots change or discount changes, compute
   useEffect(() => {
     let basePrice = selectedSlots
       .map((id) => slotsData.find((s) => s.slot_id === id)?.price || 0)
       .reduce((a, b) => a + b, 0);
-
     if (discountData) {
       if (discountData.discount_type === "percentage") {
         basePrice = basePrice - (basePrice * discountData.discount_value) / 100;
@@ -168,11 +146,9 @@ export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
         basePrice = basePrice - discountData.discount_value;
       }
     }
+    setDiscountedTotal(Math.max(basePrice, 0));
+  }, [selectedSlots, discountData, slotsData]);
 
-    setDiscountedTotal(Math.max(basePrice, 0)); // prevent negative
-  }, [selectedSlots, discountData]);
-
-  // Refs for scrolling
   const personalInfoRef = useRef<HTMLDivElement>(null);
   const slotsRef = useRef<HTMLDivElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -182,51 +158,87 @@ export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
   }, []);
 
   useEffect(() => {
-    // Pre-fill if user is logged in
     if (currentUser) {
       setFullName(currentUser.name);
       setPhone(currentUser.phone);
       setEmail(currentUser.email || "");
+
+      async function fetchUserLoyaltyData() {
+        try {
+          const userId = currentUser?.id;
+          if (!userId) return;
+
+          const { data: memberData } = await supabase.rpc(
+            "get_member_by_auth_user_id",
+            { p_auth_user_id: userId },
+          );
+
+          if (memberData && memberData.id) {
+            const { data: pointsData } = await supabase.rpc(
+              "get_usable_points",
+              { p_member_id: memberData.id },
+            );
+
+            const points = pointsData?.[0]?.total_useable_points || 0;
+            setUsablePoints(points);
+
+            const { data: tierList } = await supabase
+              .from("membership_tiers")
+              .select("*");
+
+            const totalEarnedPoints = memberData.total_earned_points || 0;
+            const sortedTiers = (tierList || []).sort(
+              (a, b) => a.min_points - b.min_points,
+            );
+
+            let currentTier: TierDetails | null = null;
+            let nextTier: TierDetails | null = null;
+
+            for (let i = 0; i < sortedTiers.length; i++) {
+              if (totalEarnedPoints >= sortedTiers[i].min_points) {
+                currentTier = sortedTiers[i];
+                nextTier = sortedTiers[i + 1] || null;
+              }
+            }
+
+            setLoyalty({
+              all_tiers: sortedTiers,
+              current_tier: currentTier,
+              next_tier: nextTier,
+              points_to_next_tier: nextTier
+                ? nextTier.min_points - totalEarnedPoints
+                : 0,
+              total_earned_points: totalEarnedPoints,
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching user loyalty data:", err);
+          setUsablePoints(0);
+          setLoyalty(null);
+        }
+      }
+
+      fetchUserLoyaltyData();
     }
   }, [currentUser]);
 
   const loadBookings = () => {
     const stored = localStorage.getItem("bookings");
-    if (stored) {
-      setBookings(JSON.parse(stored));
-    }
+    if (stored) setBookings(JSON.parse(stored));
   };
 
-  const isSlotBooked = (time: string) => {
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    return bookings.some(
-      (booking) =>
-        booking.date === dateStr &&
-        booking.sport === selectedSport &&
-        booking.slots.includes(time),
-    );
-  };
-
-  const calculateTotal = () => {
-    if (selectedSlots.length === 0) return 0;
-
-    // Get the price of each selected slot
-    const total = selectedSlots.reduce((sum, slotId) => {
+  const calculateTotal = () =>
+    selectedSlots.reduce((sum, slotId) => {
       const slot = slotsData.find((s) => s.slot_id === slotId);
       return sum + (slot?.price || 0);
     }, 0);
 
-    return total;
-  };
-
   const handleShowSummary = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (selectedSlots.length === 0) {
       toast.error("Please select at least one time slot");
       return;
     }
-
     setShowSummary(true);
     setTimeout(() => {
       summaryRef.current?.scrollIntoView({
@@ -238,301 +250,388 @@ export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
 
   const confirmationAmount = 500;
 
-  const handleConfirmBooking = async () => {
-    try {
-      if (selectedSlots.length === 0) {
-        toast.error("No slots selected!");
-        return;
-      }
-
-      // Generate a unique session ID
-      const sessionId = `session-${Date.now()}`;
-
-      // Map discount code to ID if exists
-      const discountId = discountData?.id || null;
-
-      // Prepare payload for Supabase RPC
-      const payload = {
-        p_field_id: selectedSport,
-        p_slot_ids: selectedSlots,
-        p_booking_date: format(selectedDate, "yyyy-MM-dd"),
-        p_user_id: currentUser?.id || null,
-        p_full_name: fullName,
-        p_phone_number: phone,
-        p_email: email || "",
-        p_number_of_players: players ? parseInt(players) : null,
-        p_special_notes: notes || "",
-        p_payment_method: paymentMethod,
-        p_payment_status:
-          paymentAmount === "confirmation" ? "partially_paid" : "fully_paid",
-        p_paid_amount:
-          paymentAmount === "confirmation"
-            ? confirmationAmount
-            : discountedTotal,
-        p_session_id: sessionId,
-        p_discount_code_id: discountId,
-      };
-
-      // Call Supabase RPC
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/create_booking`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      console.log("Booking API response:", data);
-
-      // Check response: adapt according to your RPC output
-      if (!res.ok || !data[0] || !data[0].booking_code) {
-        toast.error(data[0]?.message || "Booking failed. Please try again.");
-        return;
-      }
-
-      toast.success(data[0].message);
-
-      // Save booking locally (optional)
-      const newBooking: Booking = {
-        id: data[0].booking_id || Date.now().toString(),
-        code: data[0].booking_code || Date.now().toString(),
-        msg: data[0].booking_code,
-        userId: currentUser?.id,
-        fullName,
-        phone,
-        email: email || undefined,
-        sport: selectedSport,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        slots: selectedSlots.sort(),
-        players: players ? parseInt(players) : undefined,
-        notes: notes || undefined,
-        paymentMethod,
-        paymentAmount,
-        discountCode: discountCode || undefined,
-        totalPrice,
-        createdAt: new Date().toISOString(),
-      };
-
-      const allBookings = [...bookings, newBooking];
-      localStorage.setItem("bookings", JSON.stringify(allBookings));
-      setConfirmedBooking(newBooking);
-
-      // Reset form
-      setSelectedSlots([]);
-      setFullName(currentUser?.name || "");
-      setPhone(currentUser?.phone || "");
-      setEmail(currentUser?.email || "");
-      setPlayers("");
-      setNotes("");
-      setDiscountCode("");
-      setShowSummary(false);
-
-      // Scroll to top
-      window.scrollTo({ top: 0, behavior: "smooth" });
-
-      // Navigate to confirmation page
-      // If embedded in admin panel, close modal
-      if (onBookingComplete) {
-        onBookingComplete(); // Close modal and refresh admin bookings
-      } else {
-        // Navigate to confirmation page (for standalone client app)
-        navigate("/booking-confirmation", {
-          state: {
-            booking: {
-              ...newBooking,
-              slots: slotsData.filter((s) => selectedSlots.includes(s.slot_id)),
-            },
-            sportIcon: selectedSportData?.icon || " ",
-            sportName: selectedSportData?.name || " ",
-            totalPrice,
-            discountedTotal,
-            confirmationAmount,
-            bookingCode: data[0].booking_code,
-          },
-        });
-      }
-    } catch (err) {
-      console.error("Booking error:", err);
-      toast.error("Something went wrong while booking.");
+  // Cleans up the popup-closed poller if it's running.
+  const clearPopupPoll = useCallback(() => {
+    if (popupPollRef.current) {
+      window.clearInterval(popupPollRef.current);
+      popupPollRef.current = null;
     }
-  };
+  }, []);
+
+  // Listens for the postMessage that BookingSuccess.tsx sends from
+  // inside the popup once it has fetched the completed booking.
+  // This is what lets us show the confirmation on the MAIN page
+  // without ever navigating the main tab away to bKash.
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Only trust messages from our own origin (the popup navigates
+      // back to our own /booking/success page after bKash redirects it,
+      // so this will match once it's back on our domain).
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== BKASH_POPUP_MESSAGE_TYPE) return;
+
+      clearPopupPoll();
+      paymentPopupRef.current = null;
+      toast.dismiss();
+
+      if (event.data.error) {
+        toast.error(event.data.error);
+        return;
+      }
+
+      navigate("/booking-confirmation", {
+        state: event.data.payload,
+      });
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [navigate, clearPopupPoll]);
+
+  // Watches whether the user manually closed the popup before finishing.
+  const watchPopupClosed = useCallback((popup: Window) => {
+    clearPopupPoll();
+    popupPollRef.current = window.setInterval(() => {
+      if (popup.closed) {
+        clearPopupPoll();
+        paymentPopupRef.current = null;
+        toast.dismiss();
+        toast.info("Payment window closed.");
+      }
+    }, 500);
+  }, [clearPopupPoll]);
+
+  const handleConfirmBooking = async () => {
+  try {
+    if (selectedSlots.length === 0) {
+      toast.error("No slots selected!");
+      return;
+    }
+
+    if (!bookingSessionId) {
+      toast.error("Your session has expired. Please reselect your slots.");
+      return;
+    }
+
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
+    toast.loading("Confirming your booking...");
+
+    // Look up the member's actual `members` table id from the auth user id,
+    // since currentUser.id is the AUTH id, not necessarily the member row id
+    // that create_booking's p_member_id expects.
+    let memberId = null;
+    const authUser = localStorage.getItem("sb-user");
+    if (authUser) {
+      const authUserId = JSON.parse(authUser)?.id;
+      if (authUserId) {
+        const memberRes = await fetch(
+          `${BASE_URL}/rest/v1/rpc/get_member_by_auth_user_id?p_auth_user_id=${authUserId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: anonKey,
+              Authorization: `Bearer ${anonKey}`,
+            },
+          },
+        );
+        if (memberRes.ok) {
+          const memberData = await memberRes.json();
+          memberId = Array.isArray(memberData)
+            ? memberData[0]?.id
+            : memberData?.id;
+        }
+      }
+    }
+
+    // Net amount owed after promo discount AND points discount.
+    const netPayable = Math.max(
+      discountedTotal - (usePoints ? pointsDiscountValue : 0),
+      0,
+    );
+    const paidAmount =
+      paymentAmount === "confirmation" ? confirmationAmount : netPayable;
+
+    const payload = {
+      p_field_id: selectedSport,
+      p_slot_ids: selectedSlots,
+      p_booking_date: format(selectedDate, "yyyy-MM-dd"),
+      p_member_id: memberId,
+      p_full_name: fullName,
+      p_phone_number: phone,
+      p_email: email || "",
+      p_number_of_players: players ? parseInt(players) : null,
+      p_special_notes: notes || "",
+      p_payment_method: paymentMethod,
+      p_payment_status:
+        paymentAmount === "confirmation" ? "partially_paid" : "fully_paid",
+      p_paid_amount: paidAmount,
+      p_session_id: bookingSessionId,
+      p_discount_code_id: discountData?.id || null,
+      p_loyalty_points_used: usePoints ? pointsToRedeem : 0,
+    };
+
+    const res = await fetch(`${BASE_URL}/rest/v1/rpc/create_booking`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    toast.dismiss();
+
+    if (!res.ok || !data?.[0]?.booking_code) {
+      toast.error(data?.[0]?.message || "Booking failed. Please try again.");
+      return;
+    }
+
+    toast.success(data[0].message || "Booking confirmed!");
+
+    navigate("/booking-confirmation", {
+      state: {
+        booking: {
+          fullName,
+          phone,
+          email,
+          players,
+          notes,
+          paymentMethod,
+          paymentAmount,
+          discountCode,
+          totalPrice,
+          paidAmount,
+          dueAmount: Math.max(discountedTotal - paidAmount, 0),
+          slots: slotsData.filter((s) => selectedSlots.includes(s.slot_id)),
+          date: format(selectedDate, "yyyy-MM-dd"),
+        },
+        sportIcon: selectedSportData?.icon || "",
+        sportName: selectedSportData?.name || "",
+        totalPrice,
+        discountedTotal,
+        confirmationAmount,
+        bookingCode: data[0].booking_code,
+      },
+    });
+  } catch (err) {
+    console.error("Booking confirmation error:", err);
+    toast.dismiss();
+    toast.error("Something went wrong while confirming your booking.");
+  }
+};
 
   const selectedSportData = sports.find((s) => s.id === selectedSport);
   const totalPrice = calculateTotal();
+  const scrollToSlots = () =>
+    slotsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  //  scroll to personalinfoform
-  const scrollToSlots = () => {
-    slotsRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
+  const slotsSectionSportData = useMemo(
+    () => (selectedSportData ? { field_id: selectedSportData.id } : null),
+    [selectedSportData?.id],
+  );
+
   return (
-    <div>
-      <div className="max-w-7xl mx-auto px-4 pt-6 space-y-6">
-        {/* Banner  */}
+    <div style={{ fontFamily: "'Montserrat', sans-serif" }}>
+      <div className="mx-auto space-y-6">
         <Banner />
-        {/* Sport Selector */}
-        {sports.length === 0 ? (
-          <p>Loading sports...</p>
-        ) : (
-          <SportSelector
-            sports={sports}
+
+        <div className="max-w-screen-2xl mx-auto px-4 md:px-24 flex gap-10 items-start">
+          <BookingProgressSidebar
             selectedSport={selectedSport}
-            setSelectedSport={setSelectedSport}
+            selectedDate={selectedDate}
+            selectedSlots={selectedSlots}
+            fullName={fullName}
+            phone={phone}
+            showSummary={showSummary}
           />
-        )}
-        {/* calendar and slot   */}
-        <div className="flex flex-col bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl drop-shadow-lg gap-2 p-4">
-          <div className="flex flex-col md:flex-row w-full md:justify-center gap-8 p-4 rounded-xl drop-shadow-lg">
-            {/* Date Selector - Calendar View */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="space-y-3"
-            >
-              <h2 className="text-green-900 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-green-600" />
-                Select Date
-              </h2>
 
-              {/* calendar import */}
-              <Calendar
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-              />
-            </motion.div>
-
-            {/* Available Slots */}
-            <div ref={slotsRef}>
-              <SlotsSection
-                selectedSlots={selectedSlots}
-                setSelectedSlots={setSelectedSlots}
-                selectedSportData={
-                  selectedSportData ? { field_id: selectedSportData.id } : null
-                }
-                selectedDate={selectedDate}
-                BASE_URL={BASE_URL}
+          <div className="flex-1 min-w-0 space-y-6">
+            <div className="max-w-screen-2xl mx-auto">
+              <SportSelector
+                sports={sports}
+                selectedSport={selectedSport}
+                setSelectedSport={setSelectedSport}
               />
             </div>
-          </div>
 
-          {/* Selected Slots Box */}
-          {selectedSlots.length > 0 && slotsData.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-2xl p-6 shadow-lg"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <div className="bg-blue-500 rounded-full p-2">
-                    <Check className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Selected Slots</p>
-                    <p className="font-semibold text-purple-900">
-                      {selectedSlots.length}{" "}
-                      {selectedSlots.length === 1 ? "slot" : "slots"}
-                    </p>
-                  </div>
+            <div className="w-full pt-12 md:pt-24 flex items-center gap-4 md:gap-8 my-12">
+              <div className="relative overflow-hidden bg-green-900 h-20 w-20 md:h-32 md:w-32 rounded-full flex justify-center items-center shadow-2xl border-4 border-green-700 flex-shrink-0">
+                <motion.div
+                  className="absolute inset-0 w-full h-full"
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "200%" }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 2,
+                    ease: "linear",
+                    repeatDelay: 0.5,
+                  }}
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)",
+                    width: "50%",
+                  }}
+                />
+                <p className="relative z-10 text-white text-3xl md:text-6xl font-black">
+                  2
+                </p>
+              </div>
+              <motion.div
+                initial={{ opacity: 0, x: -50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.5 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              >
+                <p className="text-gray-900 text-xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
+                  Select date and time slots for your{" "}
+                  <span className="text-green-600">
+                    {selectedSportData?.name || "sport"}
+                  </span>
+                </p>
+              </motion.div>
+            </div>
+
+            <div className="flex flex-col">
+              <div className="flex flex-col lg:flex-row w-full justify-between rounded-xl">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                  className="space-y-3"
+                >
+                  <h2 className="text-green-900 flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-green-600" />
+                    Select Date
+                  </h2>
+                  <Calendar
+                    selectedDate={selectedDate}
+                    onDateChange={setSelectedDate}
+                  />
+                </motion.div>
+
+                <div ref={slotsRef}>
+                  <SlotsSection
+                    selectedSlots={selectedSlots}
+                    setSelectedSlots={setSelectedSlots}
+                    selectedSportData={slotsSectionSportData}
+                    selectedDate={selectedDate}
+                    BASE_URL={BASE_URL}
+                    setSlotsData={handleSetSlotsData}
+                    onSessionIdChange={setBookingSessionId}
+                  />
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">Total Amount</p>
-                  <p className="text-2xl font-bold text-purple-900">
-                    ৳{totalPrice}
+              </div>
+            </div>
+
+            <div className="pb-12">
+              <div className="w-full md:pt-12 flex items-center gap-4 md:gap-8 my-12">
+                <div className="relative overflow-hidden bg-green-900 h-20 w-20 md:h-32 md:w-32 rounded-full flex justify-center items-center shadow-2xl border-4 border-green-700 flex-shrink-0">
+                  <motion.div
+                    className="absolute inset-0 w-full h-full"
+                    initial={{ x: "-100%" }}
+                    animate={{ x: "200%" }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 2,
+                      ease: "linear",
+                      repeatDelay: 0.5,
+                    }}
+                    style={{
+                      background:
+                        "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)",
+                      width: "50%",
+                    }}
+                  />
+                  <p className="relative z-10 text-white text-3xl md:text-6xl font-black">
+                    3
                   </p>
                 </div>
+                <motion.div
+                  initial={{ opacity: 0, x: -50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, amount: 0.5 }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                >
+                  <p className="text-gray-900 text-xl md:text-4xl lg:text-5xl font-extrabold leading-tight">
+                    Enter your details and confirm booking
+                  </p>
+                </motion.div>
               </div>
 
-              {/* Slots Grid */}
-              <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 place-items-center">
-                {selectedSlots.map((slotId) => {
-                  const slot = slotsData.find((s) => s.slot_id === slotId);
-                  console.log("Selected slot:", slot);
-                  if (!slot) return null;
-                  return (
-                    <div
-                      key={slotId}
-                      className="bg-white rounded-lg p-3 text-center w-full max-w-[12rem] shadow-md"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <Clock className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {slot.start_time} - {slot.end_time}
-                        </span>
-                      </div>
-                      <span className="text-sm font-semibold text-purple-900">
-                        ৳{slot.price}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+              <PersonalInfoForm
+                fullName={fullName}
+                setFullName={setFullName}
+                phone={phone}
+                setPhone={setPhone}
+                email={email}
+                setEmail={setEmail}
+                players={players}
+                setPlayers={setPlayers}
+                notes={notes}
+                setNotes={setNotes}
+                discountCode={discountCode}
+                setDiscountCode={setDiscountCode}
+                discountData={discountData}
+                setDiscountData={setDiscountData}
+                discountedTotal={discountedTotal}
+                paymentMethod={paymentMethod}
+                setPaymentMethod={setPaymentMethod}
+                paymentAmount={paymentAmount}
+                setPaymentAmount={setPaymentAmount}
+                confirmationAmount={confirmationAmount}
+                totalPrice={totalPrice}
+                handleShowSummary={handleShowSummary}
+                personalInfoRef={personalInfoRef}
+                currentUser={currentUser}
+                usablePoints={usablePoints}
+                pointExchangeRate={1}
+                usePoints={usePoints}
+                setUsePoints={setUsePoints}
+                pointsToRedeem={pointsToRedeem}
+                setPointsToRedeem={setPointsToRedeem}
+                pointsDiscountValue={pointsDiscountValue}
+                setPointsDiscountValue={setPointsDiscountValue}
+              />
+            </div>
+
+            <SummarySection
+              showSummary={showSummary}
+              setShowSummary={setShowSummary}
+              fullName={fullName}
+              phone={phone}
+              email={email}
+              players={players}
+              notes={notes}
+              discountCode={discountCode}
+              discountData={discountData}
+              discountedTotal={discountedTotal}
+              selectedSportData={{
+                name: selectedSportData?.name || "",
+                icon: selectedSportData?.icon || "",
+              }}
+              selectedDate={selectedDate}
+              selectedSlots={selectedSlots}
+              slotsData={slotsData.filter((s) =>
+                selectedSlots.includes(s.slot_id),
+              )}
+              paymentMethod={paymentMethod}
+              paymentAmount={paymentAmount}
+              totalPrice={totalPrice}
+              confirmationAmount={confirmationAmount}
+              usePoints={usePoints}
+              pointsToRedeem={pointsToRedeem}
+              pointsDiscountValue={pointsDiscountValue}
+              summaryRef={summaryRef}
+              handleConfirmBooking={handleConfirmBooking}
+              scrollToSlots={scrollToSlots}
+            />
+          </div>
         </div>
-        {/* Personal Information Form */}
-        <PersonalInfoForm
-          fullName={fullName}
-          setFullName={setFullName}
-          phone={phone}
-          setPhone={setPhone}
-          email={email}
-          setEmail={setEmail}
-          players={players}
-          setPlayers={setPlayers}
-          notes={notes}
-          setNotes={setNotes}
-          discountCode={discountCode}
-          setDiscountCode={setDiscountCode}
-          discountData={discountData}
-          setDiscountData={setDiscountData}
-          discountedTotal={discountedTotal}
-          paymentMethod={paymentMethod}
-          setPaymentMethod={setPaymentMethod}
-          paymentAmount={paymentAmount}
-          setPaymentAmount={setPaymentAmount}
-          confirmationAmount={confirmationAmount}
-          totalPrice={totalPrice}
-          handleShowSummary={handleShowSummary}
-          personalInfoRef={personalInfoRef}
-        />
-        {/* Summary Section */}
-        <SummarySection
-          showSummary={showSummary}
-          setShowSummary={setShowSummary}
-          fullName={fullName}
-          phone={phone}
-          email={email}
-          players={players}
-          notes={notes}
-          discountCode={discountCode}
-          discountData={discountData}
-          discountedTotal={discountedTotal}
-          selectedSportData={{
-            name: selectedSportData?.name || "",
-            icon: selectedSportData?.icon || "",
-          }}
-          selectedDate={selectedDate}
-          selectedSlots={selectedSlots}
-          slotsData={slotsData.filter((s) => selectedSlots.includes(s.slot_id))}
-          paymentMethod={paymentMethod}
-          paymentAmount={paymentAmount}
-          totalPrice={totalPrice}
-          confirmationAmount={confirmationAmount}
-          summaryRef={summaryRef}
-          handleConfirmBooking={handleConfirmBooking}
-          scrollToSlots={scrollToSlots}
-        />
-        {/* footer  */}
+
         <Footer />
       </div>
     </div>

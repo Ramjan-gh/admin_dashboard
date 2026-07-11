@@ -6,22 +6,24 @@ import { ContactUs } from './components/ContactUs';
 import { Gallery } from './components/Gallery';
 import { CheckBooking } from './components/CheckBooking';
 import { Toaster } from './components/ui/sonner';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { BookingConfirmation } from './components/BookingConfirmation';
 import { supabase } from "./lib/supabase";
+// 1. Import your new bKash callback component here
+import { BookingSuccess } from './components/BookingSuccess';
 
 export type User = {
   id: string;
   name: string;
   phone: string;
   email?: string;
+  total_earned_points?: number;
 };
 
 export type Booking = {
   id: string;
   code?: string;
   msg?: string;
-  userId?: string;
   fullName: string;
   phone: string;
   email?: string;
@@ -35,14 +37,18 @@ export type Booking = {
   discountCode?: string;
   totalPrice: number;
   createdAt: string;
+  paidAmount: number;
+  dueAmount: number;
+  discountAmount?: number;
+  pointRedeemAmount?: number;
+  finalAmount?: number;
 };
 
-export default function App() {
+function AppRoutes() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'contact' | 'gallery' | 'check-booking'>('home');
 
   useEffect(() => {
-    // Check if user is logged in
     const storedUser = localStorage.getItem('currentUser');
     if (storedUser) {
       setCurrentUser(JSON.parse(storedUser));
@@ -52,47 +58,42 @@ export default function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('currentUser', JSON.stringify(user));
+    navigate('/profile');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    setCurrentView('home');
+    navigate('/');
   };
 
   return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+      <Header
+        currentUser={currentUser}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+      />
+      <main>
+        <Routes>
+          <Route path="/" element={<HomePage currentUser={currentUser} />} />
+          <Route path="/profile" element={<UserProfile currentUser={currentUser} onLogout={handleLogout} />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/check-booking" element={<CheckBooking />} />
+          <Route path="/booking/success" element={<BookingSuccess />} />
+          <Route path="/booking-confirmation" element={<BookingConfirmation />} />
+        </Routes>
+      </main>
+      <Toaster />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
-        <Header
-          currentUser={currentUser}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-        />
-
-        <main className="">
-          <Routes>
-            <Route path="/" element={<HomePage currentUser={currentUser} />} />
-            <Route
-              path="/profile"
-              element={
-                <UserProfile
-                  currentUser={currentUser}
-                  onLogout={handleLogout}
-                />
-              }
-            />
-            <Route path="/contact" element={<ContactUs />} />
-            <Route path="/gallery" element={<Gallery />} />
-            <Route path="/check-booking" element={<CheckBooking />} />
-            <Route
-              path="/booking-confirmation"
-              element={<BookingConfirmation />}
-            />
-          </Routes>
-        </main>
-
-        <Toaster />
-      </div>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

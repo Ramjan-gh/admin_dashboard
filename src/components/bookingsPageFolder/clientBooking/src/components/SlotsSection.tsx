@@ -1,10 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { format, parse } from "date-fns";
 import { toast } from "sonner";
-import { Zap, CalendarOff } from "lucide-react";
+import { Zap, CalendarOff, Clock } from "lucide-react";
 
 interface TimeSlot {
   slot_id: string;
@@ -12,7 +12,7 @@ interface TimeSlot {
   start_time: string;
   end_time: string;
   type: string;
-  status: "booked" | "available" | "held";
+  status: "booked" | "available" | "held" | "maintenance";
   price: number;
 }
 
@@ -30,7 +30,29 @@ interface SlotsSectionProps {
   selectedSportData: { field_id: string } | null | undefined;
   selectedDate: Date;
   BASE_URL: string;
-  setSlotsData?: React.Dispatch<React.SetStateAction<TimeSlot[]>>;
+  setSlotsData?: (slots: TimeSlot[]) => void;
+  onSessionIdChange?: (sessionId: string) => void;
+}
+
+// ─── Skeleton that matches real slot grid dimensions exactly ───────────────────
+function SlotSkeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2].map((shift) => (
+        <div key={shift} className="space-y-2">
+          <div className="h-4 w-24 bg-gray-200 animate-pulse rounded" />
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="min-h-[80px] bg-gray-100 animate-pulse rounded-md"
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function SlotsSection({
@@ -40,6 +62,7 @@ export function SlotsSection({
   selectedDate,
   BASE_URL,
   setSlotsData,
+  onSessionIdChange,
 }: SlotsSectionProps) {
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -48,12 +71,25 @@ export function SlotsSection({
   );
 
   const holdTimersRef = useRef<Record<string, number>>({});
-  const slotSessionIdsRef = useRef<Record<string, string>>({});
 
-  // Reset selection when date changes
+  // ── Single shared session id for this whole booking attempt.
+  // Every hold/release/payment call must use this SAME id, not a per-slot one.
+  const [sessionId, setSessionId] = useState<string>(
+    () => `session-${Math.random().toString(36).substr(2, 9)}-${Date.now()}`,
+  );
+
+  // Rotate session id + clear selection whenever the date changes.
   useEffect(() => {
     setSelectedSlots([]);
+    const newSessionId = `session-${Math.random().toString(36).substr(2, 9)}-${Date.now()}`;
+    setSessionId(newSessionId);
   }, [selectedDate, setSelectedSlots]);
+
+  // Notify parent (HomePage) whenever the session id changes,
+  // so handleConfirmBooking can reuse the exact same id.
+  useEffect(() => {
+    onSessionIdChange?.(sessionId);
+  }, [sessionId, onSessionIdChange]);
 
   /* ================= FETCH BUSINESS SCHEDULE ================= */
   useEffect(() => {
@@ -70,16 +106,13 @@ export function SlotsSection({
             },
           },
         );
-        if (res.ok) {
-          const data = await res.json();
-          setBusinessSchedule(data);
-        }
+        if (res.ok) setBusinessSchedule(await res.json());
       } catch (err) {
         console.error("Failed to fetch schedule:", err);
       }
     };
     fetchSchedule();
-  }, [BASE_URL]);
+  }, [BASE_URL]); // ✅ only re-fetch if BASE_URL changes
 
   /* ================= CHECK IF CURRENT DATE IS HOLIDAY ================= */
   const holidayInfo = useMemo(() => {
@@ -89,16 +122,37 @@ export function SlotsSection({
     );
   }, [selectedDate, businessSchedule]);
 
+  /* ================= STABLE SLOT MAPPER ================= */
+  // fieldId passed as argument so this has zero deps and never recreates.
+  const mapApiSlots = useCallback(
+    (apiData: any[], fieldId: string): TimeSlot[] =>
+      apiData.flatMap(
+        (shift: any) =>
+          shift.slots?.map((slot: any) => ({
+            slot_id: slot.slot_id,
+            field_id: fieldId,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            status: slot.status,
+            price: Number(slot.price || 0),
+            type: shift.shift_name,
+          })) || [],
+      ),
+    [], // pure function — no closure deps
+  );
+
   /* ================= FETCH SLOTS ================= */
   useEffect(() => {
-    // If it's a holiday, don't fetch slots
+    // If it's a holiday, clear and bail — no network call needed
     if (holidayInfo) {
       setAvailableSlots([]);
-      setSlotsData?.([]);
+      setSlotsData?.([]); // ✅ called but NOT in dep array
       return;
     }
 
     if (!selectedSportData || !selectedDate || !BASE_URL) return;
+
+    let cancelled = false; // ✅ prevents stale state updates if effect re-runs
 
     const fetchSlots = async () => {
       setSlotsLoading(true);
@@ -119,37 +173,35 @@ export function SlotsSection({
 
         if (!res.ok) throw new Error("Failed");
         const apiData = await res.json();
+        const mappedSlots = mapApiSlots(apiData, selectedSportData.field_id);
 
-        const mappedSlots: TimeSlot[] = apiData.flatMap(
-          (shift: any) =>
-            shift.slots?.map((slot: any) => ({
-              slot_id: slot.slot_id,
-              field_id: selectedSportData!.field_id,
-              start_time: slot.start_time,
-              end_time: slot.end_time,
-              status: slot.status,
-              price: Number(slot.price || 0),
-              type: shift.shift_name,
-            })) || [],
-        );
-
-        setAvailableSlots(mappedSlots);
-        setSlotsData?.(mappedSlots);
+        if (!cancelled) {
+          setAvailableSlots(mappedSlots);
+          setSlotsData?.(mappedSlots); // ✅ called but NOT in dep array
+        }
       } catch (err) {
-        console.error(err);
-        toast.error("Failed to fetch slots");
-        setAvailableSlots([]);
-        setSlotsData?.([]);
+        if (!cancelled) {
+          console.error(err);
+          toast.error("Failed to fetch slots");
+          setAvailableSlots([]);
+          setSlotsData?.([]); // ✅ called but NOT in dep array
+        }
       } finally {
-        setSlotsLoading(false);
+        if (!cancelled) setSlotsLoading(false);
       }
     };
 
     fetchSlots();
-  }, [selectedDate, selectedSportData, BASE_URL, holidayInfo, setSlotsData]);
 
-  /* ================= HOLD / RELEASE LOGIC ================= */
-  const refreshSlots = async () => {
+    return () => {
+      cancelled = true; // ✅ cleanup on re-run
+    };
+  }, [selectedDate, selectedSportData, BASE_URL, holidayInfo]);
+  // ✅ mapApiSlots omitted — it has [] deps so it never changes
+  // ✅ setSlotsData omitted — stable dispatch ref, including it causes refetches
+
+  /* ================= REFRESH SLOTS (internal helper) ================= */
+  const refreshSlots = useCallback(async () => {
     if (!selectedSportData || !selectedDate) return;
     try {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
@@ -166,120 +218,119 @@ export function SlotsSection({
         }),
       });
       const apiData = await res.json();
-      const mappedSlots: TimeSlot[] = apiData.flatMap(
-        (shift: any) =>
-          shift.slots?.map((slot: any) => ({
-            slot_id: slot.slot_id,
-            field_id: selectedSportData!.field_id,
-            start_time: slot.start_time,
-            end_time: slot.end_time,
-            status: slot.status,
-            price: Number(slot.price || 0),
-            type: shift.shift_name,
-          })) || [],
-      );
+      const mappedSlots = mapApiSlots(apiData, selectedSportData.field_id);
       setAvailableSlots(mappedSlots);
       setSlotsData?.(mappedSlots);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [selectedDate, selectedSportData, BASE_URL, mapApiSlots, setSlotsData]); // ✅ Added mapApiSlots and setSlotsData back to standard hook arrays safely 
 
-  const holdSlot = async (slot: TimeSlot) => {
-    if (!selectedSportData) return;
-    const displayTime = format(
-      parse(slot.start_time, "HH:mm:ss", new Date()),
-      "hh:mm a",
-    );
-    const sessionId = `session-${Math.random().toString(36).substr(2, 9)}`;
-    slotSessionIdsRef.current[slot.slot_id] = sessionId;
+  /* ================= HOLD / RELEASE LOGIC ================= */
+  const holdSlot = useCallback(
+    async (slot: TimeSlot) => {
+      if (!selectedSportData) return;
+      const displayTime = format(
+        parse(slot.start_time, "HH:mm:ss", new Date()),
+        "hh:mm a",
+      );
 
-    try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/hold_slot`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          p_slot_id: slot.slot_id,
-          p_booking_date: format(selectedDate, "yyyy-MM-dd"),
-          p_session_id: sessionId,
-          p_hold_duration_minutes: 10,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`Slot ${displayTime} held`);
-        refreshSlots();
-        holdTimersRef.current[slot.slot_id] = window.setTimeout(
-          () => releaseSlot(slot),
-          10 * 60 * 1000,
-        );
-      } else {
-        toast.error("Failed to hold slot");
+      try {
+        const res = await fetch(`${BASE_URL}/rest/v1/rpc/hold_slot`, {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_slot_id: slot.slot_id,
+            p_booking_date: format(selectedDate, "yyyy-MM-dd"),
+            p_session_id: sessionId,
+            p_hold_duration_minutes: 10,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast.success(`Slot ${displayTime} held`);
+          refreshSlots();
+          holdTimersRef.current[slot.slot_id] = window.setTimeout(
+            () => releaseSlot(slot),
+            10 * 60 * 1000,
+          );
+        } else {
+          toast.error("Failed to hold slot");
+        }
+      } catch {
+        toast.error("Error holding slot");
       }
-    } catch (err) {
-      toast.error("Error holding slot");
-    }
-  };
+    },
+    [selectedSportData, selectedDate, BASE_URL, refreshSlots, sessionId],
+  );
 
-  const releaseSlot = async (slot: TimeSlot) => {
-    const displayTime = format(
-      parse(slot.start_time, "HH:mm:ss", new Date()),
-      "hh:mm a",
-    );
-    try {
-      const sessionId = slotSessionIdsRef.current[slot.slot_id];
-      if (!sessionId) return;
-      await fetch(`${BASE_URL}/rest/v1/rpc/release_a_slot`, {
-        method: "POST",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          p_session_id: sessionId,
-          p_slot_id: slot.slot_id,
-          p_booking_date: format(selectedDate, "yyyy-MM-dd"),
-        }),
-      });
-      toast.info(`Slot ${displayTime} released`);
-      refreshSlots();
-      clearTimeout(holdTimersRef.current[slot.slot_id]);
-      delete holdTimersRef.current[slot.slot_id];
-      delete slotSessionIdsRef.current[slot.slot_id];
-      setSelectedSlots((prev) => prev.filter((id) => id !== slot.slot_id));
-    } catch (err) {
-      toast.error("Error releasing slot");
-    }
-  };
+  const releaseSlot = useCallback(
+    async (slot: TimeSlot) => {
+      const displayTime = format(
+        parse(slot.start_time, "HH:mm:ss", new Date()),
+        "hh:mm a",
+      );
+      try {
+        await fetch(`${BASE_URL}/rest/v1/rpc/release_a_slot`, {
+          method: "POST",
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            p_session_id: sessionId,
+            p_slot_id: slot.slot_id,
+            p_booking_date: format(selectedDate, "yyyy-MM-dd"),
+          }),
+        });
+        toast.info(`Slot ${displayTime} released`);
+        refreshSlots();
+        clearTimeout(holdTimersRef.current[slot.slot_id]);
+        delete holdTimersRef.current[slot.slot_id];
+        setSelectedSlots((prev) => prev.filter((id) => id !== slot.slot_id));
+      } catch {
+        toast.error("Error releasing slot");
+      }
+    },
+    [selectedDate, BASE_URL, refreshSlots, setSelectedSlots, sessionId],
+  );
 
-  const toggleSlot = (slot: TimeSlot) => {
-    if (slot.status === "booked") return;
-    if (slot.status === "held") {
-      releaseSlot(slot);
-      return;
-    }
-    holdSlot(slot);
-    setSelectedSlots((prev) =>
-      prev.includes(slot.slot_id)
-        ? prev.filter((id) => id !== slot.slot_id)
-        : [...prev, slot.slot_id],
-    );
-  };
-
-  const releaseAllHolds = () => {
-    Object.values(holdTimersRef.current).forEach(clearTimeout);
-    holdTimersRef.current = {};
-    slotSessionIdsRef.current = {};
-  };
+  const toggleSlot = useCallback(
+    (slot: TimeSlot) => {
+      if (slot.status === "booked" || slot.status === "maintenance") return;
+      if (slot.status === "held") {
+        releaseSlot(slot);
+        return;
+      }
+      holdSlot(slot);
+      setSelectedSlots((prev) =>
+        prev.includes(slot.slot_id)
+          ? prev.filter((id) => id !== slot.slot_id)
+          : [...prev, slot.slot_id],
+      );
+    },
+    [holdSlot, releaseSlot, setSelectedSlots],
+  );
 
   useEffect(() => {
-    return () => releaseAllHolds();
+    return () => {
+      Object.values(holdTimersRef.current).forEach(clearTimeout);
+      holdTimersRef.current = {};
+    };
   }, []);
+
+  /* ================= PRICE CALCULATION ================= */
+  const totalPrice = useMemo(() => {
+    return selectedSlots.reduce((sum, slotId) => {
+      const slot = availableSlots.find((s) => s.slot_id === slotId);
+      return sum + (slot?.price || 0);
+    }, 0);
+  }, [selectedSlots, availableSlots]);
 
   /* ================= UI LOGIC ================= */
   const sortedSlots = [...availableSlots].sort((a, b) =>
@@ -293,7 +344,6 @@ export function SlotsSection({
     },
     {} as Record<string, TimeSlot[]>,
   );
-
   const shiftedSlots = Object.entries(slotsByShift).map(
     ([shift_name, slots]) => ({
       shift_name,
@@ -302,97 +352,278 @@ export function SlotsSection({
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className="space-y-4"
-    >
-      <h2 className="flex items-center gap-2 text-green-900 font-semibold">
-        <Zap className="w-5 h-5 text-green-600" />
-        Available Slots
-      </h2>
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-24 items-start w-full md:pl-12">
+      {/* ── LEFT: Slots ──────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="space-y-4 mt-12 lg:mt-0 md:min-w-[459px]"
+      >
+        <h2 className="flex items-center gap-2 text-green-900 font-semibold h-7">
+          <Zap className="w-5 h-5 text-green-600 shrink-0" />
+          Available Slots
+        </h2>
 
-      {slotsLoading ? (
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-[80px] rounded-xl bg-gray-100 animate-pulse"
-            />
-          ))}
-        </div>
-      ) : holidayInfo ? (
-        /* HOLIDAY VIEW */
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center justify-center py-12 px-6 border-2 border-dashed border-red-200 rounded-2xl bg-red-50 text-center"
-        >
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-            <CalendarOff className="w-8 h-8 text-red-600" />
-          </div>
-          <h3 className="text-xl font-bold text-red-900 mb-1">
-            Business Holiday
-          </h3>
-          <p className="text-red-700 italic">
-            {holidayInfo.notes
-              ? `"${holidayInfo.notes}"`
-              : "We are closed today. Please pick another date!"}
-          </p>
-        </motion.div>
-      ) : shiftedSlots.length === 0 ? (
-        <div className="text-center py-10 text-gray-500 border rounded-xl">
-          No slots available
-        </div>
-      ) : (
-        shiftedSlots.map((shift) => (
-          <div key={shift.shift_name} className="space-y-2">
-            <h3 className="text-sm font-semibold text-green-800">
-              {shift.shift_name}
-            </h3>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {shift.slots.map((slot) => {
-                const displayTime = format(
-                  parse(slot.start_time, "HH:mm:ss", new Date()),
-                  "hh:mm a",
-                );
-                const isSelected = selectedSlots.includes(slot.slot_id);
-                const colorClass =
-                  slot.status === "booked"
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : isSelected
-                      ? "bg-blue-500 text-white ring-2 ring-purple-400"
-                      : slot.status === "held"
-                        ? "bg-yellow-500 text-white"
-                        : "bg-gradient-to-br from-green-400 to-emerald-500 text-gray-800";
-
-                return (
-                  <motion.button
-                    key={slot.slot_id}
-                    onClick={() => toggleSlot(slot)}
-                    disabled={slot.status === "booked"}
-                    whileHover={slot.status !== "booked" ? { scale: 1.05 } : {}}
-                    whileTap={
-                      slot.status === "available" ? { scale: 0.95 } : {}
-                    }
-                    className={`p-3 rounded-xl shadow border flex flex-col items-center justify-center min-h-[80px] ${colorClass}`}
+        <div className="min-h-[300px] md:w-[390px]">
+          <AnimatePresence mode="wait">
+            {slotsLoading ? (
+              <motion.div
+                key="skeleton"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                <SlotSkeleton />
+              </motion.div>
+            ) : holidayInfo ? (
+              <motion.div
+                key="holiday"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col items-center justify-center py-12 px-6 border-2 border-dashed border-red-200 bg-red-50 text-center"
+              >
+                <div className="w-16 h-16 bg-red-100 flex items-center justify-center mb-4">
+                  <CalendarOff className="w-8 h-8 text-red-600" />
+                </div>
+                <h3 className="text-xl font-bold text-red-900 mb-1">
+                  Business Holiday
+                </h3>
+                <p className="text-red-700 italic">
+                  {holidayInfo.notes
+                    ? `"${holidayInfo.notes}"`
+                    : "We are closed today. Please pick another date!"}
+                </p>
+              </motion.div>
+            ) : shiftedSlots.length === 0 ? (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col items-center justify-center py-12 px-6 rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.02] backdrop-blur-sm transition-colors"
+              >
+                <div className="mb-3 p-3 rounded-full bg-white/5">
+                  <svg
+                    className="w-6 h-6 text-gray-500 opacity-50"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <span className="font-bold">{displayTime}</span>
-                    <span className="text-xs mt-1">
-                      {slot.status === "booked"
-                        ? "Booked"
-                        : slot.status === "held"
-                          ? "Held"
-                          : `৳${slot.price.toLocaleString()}`}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-        ))
-      )}
-    </motion.div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-gray-400 font-bold text-sm md:text-base uppercase tracking-widest">
+                  No slots available
+                </h3>
+                <p className="mt-1 text-gray-500 text-xs md:text-sm max-w-[200px] text-center">
+                  Check back later or try selecting a different date.
+                </p>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="slots"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                {shiftedSlots.map((shift) => (
+                  <div key={shift.shift_name} className="space-y-2">
+                    <h3 className="text-sm font-semibold text-green-800">
+                      {shift.shift_name}
+                    </h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:w-[400px]">
+                      {shift.slots.map((slot) => {
+                        const displayTime = format(
+                          parse(slot.start_time, "HH:mm:ss", new Date()),
+                          "hh:mm a",
+                        );
+                        const displayEndTime = format(
+                          parse(slot.end_time, "HH:mm:ss", new Date()),
+                          "hh:mm a",
+                        );
+                        const isSelected = selectedSlots.includes(slot.slot_id);
+                        
+                        // Define layout dynamic styles including the new "maintenance" profile
+                        const colorClass =
+                          slot.status === "booked"
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : slot.status === "maintenance"
+                              ? "bg-amber-100 text-amber-700 border border-amber-300 cursor-not-allowed opacity-75"
+                              : isSelected
+                                ? "bg-blue-500 text-white ring-2 ring-purple-400 shadow-green-500"
+                                : slot.status === "held"
+                                  ? "bg-yellow-500 text-white"
+                                  : "bg-gradient-to-br from-green-400 to-emerald-500 text-gray-800";
+
+                        return (
+                          <motion.button
+                            key={slot.slot_id}
+                            onClick={() => toggleSlot(slot)}
+                            disabled={slot.status === "booked" || slot.status === "maintenance"}
+                            whileHover={
+                              slot.status !== "booked" && slot.status !== "maintenance" ? { scale: 1.05 } : {}
+                            }
+                            whileTap={
+                              slot.status === "available" ? { scale: 0.95 } : {}
+                            }
+                            className={`p-3 rounded-md shadow-xl flex flex-col gap-4 items-center justify-center min-h-[80px] ${colorClass}`}
+                          >
+                            <div className="flex text-black/50 font-bold text-xs">
+                              <span className="leading-tight text-center">
+                                {displayTime}
+                              </span>
+                              <span className="flex items-center">-</span>
+                              <span className="leading-tight text-center">
+                                {displayEndTime}
+                              </span>
+                            </div>
+                            <span className={`font-semibold ${slot.status === "maintenance" ? "text-amber-800" : "text-white/80"}`}>
+                              {slot.status === "booked"
+                                ? "Booked"
+                                : slot.status === "maintenance"
+                                  ? "Maintenance"
+                                  : slot.status === "held"
+                                    ? "Held"
+                                    : `৳${slot.price.toLocaleString()}`}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+
+      {/* ── RIGHT: Summary panel ── */}
+      <div className="min-h-[300px]">
+        <AnimatePresence mode="wait">
+          {selectedSlots.length > 0 && availableSlots.length > 0 ? (
+            <motion.div
+              key="summary"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="bg-green-900 rounded-md p-6"
+            >
+              <div className="flex flex-col gap-2 mb-4">
+                <div>
+                  <p className="text-lg font-bold text-white">Selected Slots</p>
+                  <p className="font-semibold text-gray-200">
+                    {selectedSlots.length}{" "}
+                    {selectedSlots.length === 1 ? "slot" : "slots"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Total Amount</p>
+                  <motion.p
+                    key={totalPrice}
+                    className="text-4xl font-bold text-gray-200 flex items-center"
+                  >
+                    <motion.span
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        visible: { transition: { staggerChildren: 0.05 } },
+                      }}
+                    >
+                      {`৳${totalPrice.toLocaleString()}`
+                        .split("")
+                        .map((char, index) => (
+                          <motion.span
+                            key={`${char}-${index}`}
+                            variants={{
+                              hidden: { opacity: 0, display: "none" },
+                              visible: { opacity: 1, display: "inline-block" },
+                            }}
+                          >
+                            {char}
+                          </motion.span>
+                        ))}
+                    </motion.span>
+                    <motion.span
+                      animate={{ opacity: [0, 1, 0] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                      className="inline-block w-1 h-8 bg-yellow-500 ml-2"
+                    />
+                  </motion.p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <AnimatePresence initial={false}>
+                  {selectedSlots.map((slotId) => {
+                    const slot = availableSlots.find(
+                      (s) => s.slot_id === slotId,
+                    );
+                    if (!slot) return null;
+                    return (
+                      <motion.div
+                        key={slotId}
+                        initial={{ opacity: 0, scale: 0.9, y: 8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, y: 8 }}
+                        transition={{ duration: 0.15 }}
+                        className="bg-white rounded-lg p-3 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-green-900 shrink-0" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {slot.start_time} - {slot.end_time}
+                          </span>
+                        </div>
+                        <span className="text-lg font-bold text-green-900">
+                          ৳{slot.price}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="placeholder"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="flex flex-col items-center justify-center h-full min-h-[240px] md:min-w-[300px] 
+             bg-zinc-900/20 backdrop-blur-sm 
+             border-2 border-dashed border-white/5 rounded-2xl 
+             text-zinc-500 transition-all duration-300 group"
+            >
+              <div className="relative mb-4">
+                <div className="absolute inset-0 rounded-full bg-white/5 animate-ping opacity-20" />
+                <div className="relative p-4 rounded-full bg-white/[0.03] border border-white/5 group-hover:border-white/20 transition-colors">
+                  <Clock className="w-8 h-8 opacity-40 group-hover:opacity-100 group-hover:text-white transition-all duration-500" />
+                </div>
+              </div>
+              <div className="space-y-1 text-center">
+                <p className="text-white/60 font-semibold tracking-wide text-sm md:text-base">
+                  Ready to book?
+                </p>
+                <p className="text-[11px] md:text-xs text-zinc-500 max-w-[180px] leading-relaxed">
+                  Your selected time slots will be neatly listed here.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }

@@ -1,166 +1,237 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Masonry from "react-masonry-css";
-import { X } from "lucide-react";
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { useState, useEffect, useCallback } from "react";
+import { X, Maximize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Ticket } from "lucide-react";
 import Footer from "./Footer";
 
-type Media = {
-  media_type: string;
-  file_url: string;
-  category?: string; // optional
-  title?: string; // optional
+const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
+
+// Exact same dimensions as the real image tile: w-72 h-72
+function ImageSkeleton() {
+  return (
+    <div className="w-72 h-72 flex-shrink-0 rounded-md overflow-hidden relative bg-neutral-200">
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(90deg, #e5e5e5 25%, #f5f5f5 50%, #e5e5e5 75%)",
+          backgroundSize: "200% 100%",
+          animation: "shimmer 1.6s ease-in-out infinite",
+        }}
+      />
+    </div>
+  );
+}
+
+const slideVariants = {
+  enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? "-100%" : "100%", opacity: 0 }),
 };
 
 export function Gallery() {
-  const [medias, setMedias] = useState<Media[]>([]);
-  const [selectedMedia, setSelectedMedia] = useState<number | null>(null);
-
-  const baseUrl = "https://himsgwtkvewhxvmjapqa.supabase.co"; // replace with your Supabase REST URL
+  const [images, setImages] = useState<{ file_url: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [direction, setDirection] = useState<1 | -1>(1);
 
   useEffect(() => {
-    async function fetchMedia() {
+    let isMounted = true;
+    const fetchGallery = async () => {
       try {
-        const res = await fetch(`${baseUrl}/rest/v1/rpc/get_gallery_medias`, {
+        const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_gallery_medias`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-            Authorization: `Bearer ${
-              import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-            }`,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
           },
-          body: JSON.stringify({ p_limit: 50, p_offset: 0 }),
+          body: JSON.stringify({ p_limit: 100, p_offset: 0 }),
         });
-
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("Supabase RPC failed:", res.status, text);
-          return;
+        const data: { file_url: string; media_type: string }[] =
+          await res.json();
+        if (!res.ok) throw new Error("Failed to load gallery");
+        if (isMounted) {
+          setImages(data);
+          setLoading(false);
         }
-
-        const data = await res.json();
-        console.log("Gallery data:", data);
-
-        // Filter only images
-        setMedias(data.filter((m: Media) => m.media_type === "image"));
       } catch (err) {
-        console.error("Failed to fetch media:", err);
+        console.error("Error fetching gallery:", err);
+        if (isMounted) setLoading(false);
       }
-    }
-
-    fetchMedia();
+    };
+    fetchGallery();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Masonry responsive breakpoints
-  const breakpointColumnsObj = {
-    default: 4,
-    1280: 3,
-    768: 2,
-    480: 1,
-  };
+  const goNext = useCallback(() => {
+    if (selectedIndex === null) return;
+    setDirection(1);
+    setSelectedIndex((prev) => (prev! + 1) % images.length);
+  }, [selectedIndex, images.length]);
+
+  const goPrev = useCallback(() => {
+    if (selectedIndex === null) return;
+    setDirection(-1);
+    setSelectedIndex((prev) => (prev! - 1 + images.length) % images.length);
+  }, [selectedIndex, images.length]);
+
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") goNext();
+      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "Escape") setSelectedIndex(null);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [selectedIndex, goNext, goPrev]);
+
+  const selectedImage =
+    selectedIndex !== null ? images[selectedIndex]?.file_url : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pt-12 space-y-12">
-      {/* Hero Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-gradient-to-br from-pink-600 via-purple-600 to-indigo-600 rounded-3xl p-12 text-white shadow-2xl text-center"
-      >
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
-        <div className="relative z-10 max-w-2xl mx-auto">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-4 text-3xl md:text-5xl font-bold"
-          >
-            Our Gallery
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="text-lg text-white/90"
-          >
-            Explore our premium sports facilities and see where the magic
-            happens
-          </motion.p>
-        </div>
-      </motion.div>
+    <>
+      <style>{`
+        @keyframes shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
 
-      {/* Masonry Gallery */}
-      <Masonry
-        breakpointCols={breakpointColumnsObj}
-        className="flex w-auto gap-4"
-        columnClassName="bg-clip-padding"
+      <section
+        className="mx-auto px-8 md:px-32 py-16 md:py-24"
+        style={{ fontFamily: "'Montserrat', sans-serif" }}
       >
-        {medias.map((media, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.05 }}
-            className="relative cursor-pointer rounded-2xl overflow-hidden shadow-lg group mb-4" // mb-4 fixes row gap
-            onClick={() => setSelectedMedia(index)}
-          >
-            <ImageWithFallback
-              src={media.file_url}
-              alt={`Gallery image ${index}`}
-              className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-            {/* Overlay with optional category/title */}
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-              {media.category && (
-                <span className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white mb-2">
-                  {media.category}
-                </span>
-              )}
-              {media.title && (
-                <h3 className="text-white font-semibold">{media.title}</h3>
-              )}
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.5 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+        >
+          <div className="mb-8 text-center md:text-left">
+            <div className="flex items-center gap-2 pb-4">
+              <Ticket className="w-3 h-3 text-green-700" />
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                Reservation Portal
+              </p>
             </div>
-          </motion.div>
-        ))}
-      </Masonry>
+            <h2 className="text-4xl md:text-5xl font-black text-green-900">
+              Our Turfs
+            </h2>
+            <p className="text-lg text-slate-500 max-w-lg pt-4">
+              Explore our premium facilities and playing grounds.
+            </p>
+          </div>
+        </motion.div>
 
-      {/* Lightbox */}
-      <AnimatePresence>
-        {selectedMedia !== null && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-            onClick={() => setSelectedMedia(null)}
-          >
-            <button
-              onClick={() => setSelectedMedia(null)}
-              className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors"
-            >
-              <X className="w-6 h-6 text-white" />
-            </button>
-
+        {/* Grid */}
+        <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 space-y-3">
+          {loading
+            ? Array.from({ length: 9 }).map((_, i) => (
+              <div
+                key={i}
+                className="break-inside-avoid w-full aspect-square rounded-xl overflow-hidden relative bg-neutral-200"
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: "linear-gradient(90deg, #e5e5e5 25%, #f5f5f5 50%, #e5e5e5 75%)",
+                    backgroundSize: "200% 100%",
+                    animation: "shimmer 1.6s ease-in-out infinite",
+                  }}
+                />
+              </div>
+            ))
+            : images.map((img, index) => (
+              <motion.div
+                key={index}
+                onClick={() => {
+                  setDirection(1);
+                  setSelectedIndex(index);
+                }}
+                className="break-inside-avoid relative w-full cursor-pointer overflow-hidden rounded-xl group bg-neutral-100"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.2 }}
+              >
+                <img
+                  src={img.file_url}
+                  alt="Turf Gallery"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Maximize2 className="text-white w-6 h-6" />
+                </div>
+              </motion.div>
+            ))}
+        </div>
+        {/* Lightbox */}
+        <AnimatePresence>
+          {selectedImage && selectedIndex !== null && (
             <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              className="max-w-5xl w-full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+              onClick={() => setSelectedIndex(null)}
             >
-              <ImageWithFallback
-                src={medias[selectedMedia].file_url}
-                alt={`Gallery image ${selectedMedia}`}
-                className="w-full h-auto rounded-2xl"
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {/* Close */}
+              <button
+                className="absolute top-4 right-4 text-white hover:text-green-400 transition-colors z-20 bg-white/10 hover:bg-white/20 rounded-full p-2"
+                onClick={() => setSelectedIndex(null)}
+              >
+                <X size={28} />
+              </button>
 
+              {/* Counter */}
+              <div className="absolute top-5 left-1/2 -translate-x-1/2 text-white/60 text-sm font-medium tracking-widest z-20">
+                {selectedIndex + 1} / {images.length}
+              </div>
+
+              {/* Prev */}
+              <button
+                className="absolute left-2 md:left-4 text-white/70 hover:text-white transition-colors z-20 p-2 rounded-full hover:bg-white/10"
+                onClick={(e) => { e.stopPropagation(); goPrev(); }}
+              >
+                <ChevronLeft size={44} />
+              </button>
+
+              {/* Image area — full screen minus nav buttons */}
+              <div
+                className="relative flex items-center justify-center w-full h-full px-16 py-14"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AnimatePresence initial={false} custom={direction} mode="popLayout">
+                  <motion.img
+                    key={selectedIndex}
+                    custom={direction}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+                    src={selectedImage}
+                    alt="Gallery image"
+                    className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-2xl"
+                    style={{ maxHeight: "calc(100vh - 112px)", maxWidth: "calc(100vw - 128px)" }}
+                  />
+                </AnimatePresence>
+              </div>
+
+              {/* Next */}
+              <button
+                className="absolute right-2 md:right-4 text-white/70 hover:text-white transition-colors z-20 p-2 rounded-full hover:bg-white/10"
+                onClick={(e) => { e.stopPropagation(); goNext(); }}
+              >
+                <ChevronRight size={44} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
       <Footer />
-    </div>
+    </>
   );
 }

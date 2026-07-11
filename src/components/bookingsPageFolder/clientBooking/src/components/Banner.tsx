@@ -1,184 +1,266 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Zap } from "lucide-react";
+import { useOrg } from "../context/OrgContext"; // ← ADD THIS
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
 
-// Memory cache (so it fetches only once)
 let bannerCache: { file_url: string }[] | null = null;
+let isFetchingGlobal = false;
 
 export function Banner() {
-  const [banners, setBanners] = useState<{ file_url: string }[]>([]);
+  const { org } = useOrg(); // ← REPLACES the org fetch useEffect entirely
+
+  const [banners, setBanners] = useState<{ file_url: string }[]>(
+    bannerCache || [],
+  );
   const [currentBanner, setCurrentBanner] = useState(0);
-  const [direction, setDirection] = useState(0); // <-- controls slide direction
-  const [loading, setLoading] = useState(true);
+  const [direction, setDirection] = useState(0);
+  const [loading, setLoading] = useState(!bannerCache);
   const [error, setError] = useState(false);
 
-  // Touch swipe refs
   const startX = useRef<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMounted = useRef(true);
 
-  // Fetch banners with in-memory cache
-  const fetchBanners = async () => {
+  const startAutoSlide = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      if (!isMounted.current) return;
+      setDirection(1);
+      setCurrentBanner((prev) => (prev + 1) % (bannerCache?.length || 1));
+    }, 5000);
+  }, []);
+
+  useEffect(() => {
+    isMounted.current = true;
+
     if (bannerCache) {
       setBanners(bannerCache);
       setLoading(false);
+      startAutoSlide();
       return;
     }
 
-    try {
-      const res = await fetch(`${BASE_URL}/rest/v1/rpc/get_banners`, {
-        method: "GET",
-        headers: {
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-          Authorization: `Bearer ${
-            import.meta.env.VITE_SUPABASE_ANON_KEY || ""
-          }`,
-        },
+    if (isFetchingGlobal) {
+      const poll = setInterval(() => {
+        if (bannerCache) {
+          clearInterval(poll);
+          if (!isMounted.current) return;
+          setBanners(bannerCache);
+          setLoading(false);
+          startAutoSlide();
+        }
+      }, 100);
+      return () => clearInterval(poll);
+    }
+
+    isFetchingGlobal = true;
+    fetch(`${BASE_URL}/rest/v1/rpc/get_banners`, {
+      method: "GET",
+      headers: {
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ""}`,
+      },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch banners");
+        return res.json();
+      })
+      .then((data) => {
+        bannerCache = data;
+        data.forEach((b: { file_url: string }) => {
+          const img = new Image();
+          img.src = b.file_url;
+        });
+        if (!isMounted.current) return;
+        setBanners(data);
+        setLoading(false);
+        startAutoSlide();
+      })
+      .catch((err) => {
+        console.error("Banner Fetch Error:", err);
+        if (!isMounted.current) return;
+        setError(true);
+        setLoading(false);
+      })
+      .finally(() => {
+        isFetchingGlobal = false;
       });
 
-      if (!res.ok) throw new Error("Failed to fetch banners");
+    return () => {
+      isMounted.current = false;
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []); // ← empty array: runs once only
 
-      const data = await res.json();
-      bannerCache = data;
+  const slideNext = useCallback(() => {
+    setDirection(1);
+    setCurrentBanner((prev) => (prev + 1) % (bannerCache?.length || 1));
+    startAutoSlide();
+  }, [startAutoSlide]);
 
-      setBanners(data);
-    } catch (err) {
-      console.error(err);
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const slidePrev = useCallback(() => {
+    setDirection(-1);
+    setCurrentBanner(
+      (prev) =>
+        (prev - 1 + (bannerCache?.length || 1)) % (bannerCache?.length || 1),
+    );
+    startAutoSlide();
+  }, [startAutoSlide]);
 
-  useEffect(() => {
-    fetchBanners();
-  }, []);
-
-  // Auto-slide
-  useEffect(() => {
-    if (banners.length <= 1) return;
-    const interval = setInterval(() => {
-      slideNext();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [banners]);
-
-  // Handlers
-  const slideNext = () => {
-    setDirection(1); // left → right
-    setCurrentBanner((prev) => (prev + 1) % banners.length);
-  };
-
-  const slidePrev = () => {
-    setDirection(-1); // right → left
-    setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length);
-  };
-
-  // Touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!startX.current) return;
-
     const diff = e.changedTouches[0].clientX - startX.current;
-
-    if (diff > 50) slidePrev(); // swipe right → previous
-    if (diff < -50) slideNext(); // swipe left → next
-
+    if (diff > 50) slidePrev();
+    if (diff < -50) slideNext();
     startX.current = null;
   };
 
-  // Motion variants for left/right swipe animation
   const swipeVariants = {
-    enter: (dir: number) => ({
-      x: dir > 0 ? "100%" : "-100%", // fully slide from right or left
-    }),
-    center: {
-      x: "0%", // perfect center
-    },
-    exit: (dir: number) => ({
-      x: dir > 0 ? "-100%" : "100%", // fully slide out
-    }),
+    enter: (dir: number) => ({ x: dir > 0 ? "100%" : "-100%", opacity: 0 }),
+    center: { x: "0%", opacity: 1 },
+    exit: (dir: number) => ({ x: dir > 0 ? "-100%" : "100%", opacity: 0 }),
   };
-
-
 
   return (
     <div
-      className="relative w-full h-[250px] md:h-[300px] lg:h-[400px] rounded-3xl overflow-hidden shadow-2xl"
+      className="relative w-full h-[250px] md:h-[500px] lg:h-[500px] overflow-hidden bg-gray-100"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Loading / error */}
       {loading ? (
-        <div className="w-full h-full bg-gray-200" />
-      ) : error || banners.length === 0 ? (
+        <div className="w-full h-full bg-gray-200 animate-pulse" />
+      ) : error && banners.length === 0 ? (
         <div className="w-full h-full bg-red-400 text-white flex items-center justify-center font-bold">
           Failed to load banners
         </div>
       ) : (
         <div className="relative w-full h-full overflow-hidden">
+          <div
+            className="absolute inset-0 z-10"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.8) 100%)",
+            }}
+          />
+
+          {banners.map((banner) => (
+            <div
+              key={banner.file_url}
+              className="absolute top-0 left-0 w-full h-full"
+              style={{
+                backgroundImage: `url(${banner.file_url})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                opacity: 0,
+                zIndex: 0,
+              }}
+            />
+          ))}
+
           <AnimatePresence initial={false} custom={direction}>
-            <motion.img
-              key={banners[currentBanner].file_url}
-              src={banners[currentBanner].file_url}
-              className="absolute top-0 left-0 w-full h-full object-cover"
+            <motion.div
+              key={currentBanner}
+              className="absolute top-0 left-0 w-full h-full"
+              style={{
+                backgroundImage: `url(${banners[currentBanner]?.file_url})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                zIndex: 1,
+              }}
               custom={direction}
               variants={swipeVariants}
               initial="enter"
               animate="center"
               exit="exit"
               transition={{
-                x: { type: "tween", duration: 0.35, ease: "easeInOut" },
+                x: { type: "tween", duration: 0.4, ease: "easeInOut" },
               }}
             />
           </AnimatePresence>
         </div>
       )}
 
-      {/* Overlay text */}
-      <div className="absolute top-6 left-6 z-10 p-6 md:p-12 text-white">
-        <h1 className="text-2xl md:text-4xl font-bold">
-          Book Your <span className="text-yellow-400">T</span>
-        </h1>
-        <p className="flex items-center gap-2 text-sm md:text-lg mt-2">
-          <Zap className="w-5 h-5" /> Select a sport, date & time slot
-        </p>
+      {/* Overlay Text */}
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center text-center px-4 pointer-events-none">
+        <motion.h1 className="text-4xl md:text-7xl lg:text-9xl font-black leading-tight">
+          <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+            {["Welcome", "to"].map((word, i) => (
+              <motion.span
+                key={i}
+                initial={{ opacity: 0, y: 50, rotateX: -90 }}
+                animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                transition={{ duration: 0.6, delay: i * 0.2 }}
+                className="text-white inline-block"
+              >
+                {word}
+              </motion.span>
+            ))}
+          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-yellow-400 mt-2"
+          >
+            {org?.name || "TurfBook"} {/* ← uses context, no extra fetch */}
+          </motion.div>
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.4 }}
+          className="flex items-center gap-2 text-sm md:text-lg lg:text-xl mt-6 text-white font-semibold"
+        >
+          <Zap className="w-5 h-5 text-yellow-400" fill="currentColor" />
+          Select a sport, date & time slot
+        </motion.p>
       </div>
 
-      {/* Arrows */}
+      {/* Navigation UI */}
       {banners.length > 1 && (
         <>
-          <button
-            onClick={slidePrev}
-            className="hidden md:block absolute top-1/2 left-3 -translate-y-1/2 bg-black/40 p-2 rounded-full text-white z-20 hover:bg-black/60 transition"
-          >
-            <ChevronLeft className="w-7 h-7" />
-          </button>
+          <div className="absolute inset-y-0 left-4 md:left-6 z-20 flex items-center">
+            <button
+              onClick={slidePrev}
+              className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white hover:bg-white/30 transition-all shadow-lg pointer-events-auto"
+            >
+              <ChevronLeft className="w-6 h-6 md:w-7 md:h-7" strokeWidth={3} />
+            </button>
+          </div>
 
-          <button
-            onClick={slideNext}
-            className="hidden md:block absolute top-1/2 right-3 -translate-y-1/2 bg-black/40 p-2 rounded-full text-white z-20 hover:bg-black/60 transition"
-          >
-            <ChevronRight className="w-7 h-7" />
-          </button>
+          <div className="absolute inset-y-0 right-4 md:right-6 z-20 flex items-center">
+            <button
+              onClick={slideNext}
+              className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white hover:bg-white/30 transition-all shadow-lg pointer-events-auto"
+            >
+              <ChevronRight className="w-6 h-6 md:w-7 md:h-7" strokeWidth={3} />
+            </button>
+          </div>
 
-          {/* Pagination dots */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-            {banners.map((_, i) => (
-              <div
-                key={i}
-                onClick={() => {
-                  setDirection(i > currentBanner ? 1 : -1);
-                  setCurrentBanner(i);
-                }}
-                className={`w-2.5 h-2.5 rounded-full cursor-pointer ${
-                  i === currentBanner ? "bg-white" : "bg-gray-400"
-                }`}
-              />
-            ))}
+          <div className="absolute inset-x-0 bottom-6 z-20 flex items-center justify-center">
+            <div className="flex gap-2.5">
+              {banners.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setDirection(i > currentBanner ? 1 : -1);
+                    setCurrentBanner(i);
+                    startAutoSlide();
+                  }}
+                  className={`transition-all pointer-events-auto ${
+                    i === currentBanner
+                      ? "w-8 h-3 bg-white rounded-full"
+                      : "w-3 h-3 bg-white/50 rounded-full"
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </>
       )}

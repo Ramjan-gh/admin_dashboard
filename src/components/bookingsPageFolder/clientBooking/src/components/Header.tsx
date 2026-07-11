@@ -1,20 +1,21 @@
-import { User } from '../App';
-import { Button } from './ui/button';
+import { User } from "../App";
+import { Button } from "./ui/button";
 import {
   Menu,
   User as UserIcon,
   Home,
   LogOut,
-  Info,
   Mail,
   Image,
   Search,
-} from 'lucide-react';
-import { useState } from 'react';
-import { AuthModal } from './AuthModal';
-import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
-import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+  Sparkles,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import { AuthModal } from "./AuthModal";
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { motion } from "framer-motion";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useOrg } from "../context/OrgContext";
 
 type HeaderProps = {
   currentUser: User | null;
@@ -27,176 +28,345 @@ export function Header({ currentUser, onLogin, onLogout }: HeaderProps) {
   const location = useLocation();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { org } = useOrg();
 
-  // 🔹 ONE helper for all navigation + scroll
+  // Local state to manage the fetched profile name vs Gmail fallback
+  const [memberName, setMemberName] = useState<string>("");
+
+  // Fetch custom member name when currentUser changes
+  useEffect(() => {
+    if (!currentUser) {
+      setMemberName("");
+      return;
+    }
+
+    // Set fallback name immediately while fetching
+    setMemberName(currentUser.name || "User");
+
+    const fetchMemberProfileName = async () => {
+      try {
+        // IMPORTANT: this must point at your actual backend/API,
+        // NOT window.location.origin (that's your frontend's own origin,
+        // which is why this was silently failing before).
+        // Set VITE_API_URL in your .env file, e.g.:
+        //   VITE_API_URL=https://your-backend.example.com
+        const baseUrl = "https://himsgwtkvewhxvmjapqa.supabase.co";
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        if (!baseUrl) {
+          console.error(
+            "VITE_API_URL is not set — cannot fetch member profile name."
+          );
+          return;
+        }
+
+        const response = await fetch(
+          `${baseUrl}/rest/v1/rpc/get_member_by_auth_user_id`, // Removed '?id=...' from URL
+          {
+            method: "POST", // Changed to POST
+            headers: {
+              "apikey": anonKey,
+              "Authorization": `Bearer ${anonKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              p_auth_user_id: currentUser.id
+            })
+          }
+        );
+
+        const data = await response.json();
+        console.log("Member lookup raw response:", data); // remove once confirmed working
+
+        // Handle both possible shapes: a single object, or an array of rows
+        const record = Array.isArray(data) ? data[0] : data;
+
+        if (record?.full_name) {
+          setMemberName(record.full_name);
+        } else {
+          console.warn(
+            "Member lookup succeeded but no `full_name` field found in response:",
+            data
+          );
+        }
+      } catch (error) {
+        console.error("Failed to fetch member name from database:", error);
+      }
+    };
+
+    if (currentUser.id) {
+      fetchMemberProfileName();
+    }
+  }, [currentUser]);
+
   const handleNavigate = (path: string) => {
     navigate(path);
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleLoginSuccess = (user: User) => {
+    onLogin(user);
+    setShowAuthModal(false);
   };
 
   const navItems = [
-    { id: 'home' as const, label: 'Home', icon: Home },
-    { id: 'gallery' as const, label: 'Gallery', icon: Image },
-    { id: 'check-booking' as const, label: 'Track Booking', icon: Search },
-    { id: 'contact' as const, label: 'Contact', icon: Mail },
+    { id: "home" as const, label: "Home", icon: Home },
+    { id: "gallery" as const, label: "Gallery", icon: Image },
+    { id: "check-booking" as const, label: "Track", icon: Search },
+    { id: "contact" as const, label: "Contact", icon: Mail },
   ];
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
-    <>
+    <div className="mx-auto w-full">
       <motion.header
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="bg-white/90 backdrop-blur-xl border-b-2 border-purple-200 sticky top-0 z-50 shadow-lg"
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="bg-[#0F5132] sticky top-0 z-50 "
+        style={{ fontFamily: "'Montserrat', sans-serif" }}
       >
-        <div className="px-4 py-3 flex items-center justify-between max-w-7xl mx-auto">
-          {/* LOGO */}
-          <motion.button
-            onClick={() => handleNavigate('/')}
-            className="flex items-center gap-2"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <motion.div
-              animate={{ rotate: [0, 10, -10, 0] }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-              className="w-10 h-10 bg-gradient-to-br from-blue-500 via-pink-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg"
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-[2500px]">
+          <div className="flex items-center justify-between h-24">
+            {/* LOGO */}
+            <motion.button
+              onClick={() => handleNavigate("/")}
+              className="flex items-center gap-3 group"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <span className="text-xl">⚽</span>
-            </motion.div>
-            <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 bg-clip-text text-transparent">
-              TurfBook
-            </span>
-          </motion.button>
+              <div className="relative">
+                {org?.logo_url ? (
+                  <motion.img
+                    src={org.logo_url}
+                    alt={org.name}
+                    className="w-12 h-12 rounded-2xl object-cover shadow-lg group-hover:shadow-xl transition-shadow"
+                    whileHover={{ rotate: 5 }}
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center" />
+                )}
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#F8FAFC]">
+                  {org?.name || "Loading..."}
+                </h1>
+                <p className="text-[9px] text-[#F8FAFC] font-bold tracking-widest uppercase justify-start hidden md:flex">
+                  Book • Play • Win
+                </p>
+              </div>
+            </motion.button>
 
-          {/* DESKTOP NAV */}
-          <div className="hidden lg:flex items-center gap-2">
-            {navItems.map((item) => (
-              <motion.div key={item.id} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    handleNavigate('/' + (item.id === 'home' ? '' : item.id))
-                  }
-                  className={`${
-                    location.pathname ===
-                    (item.id === 'home' ? '/' : '/' + item.id)
-                      ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700'
-                      : 'hover:bg-purple-50'
-                  }`}
+            {/* DESKTOP NAV */}
+            <nav className="hidden lg:flex items-center gap-1">
+              {navItems.map((item) => (
+                <motion.div
+                  key={item.id}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <item.icon className="w-4 h-4 mr-2" />
-                  {item.label}
-                </Button>
-              </motion.div>
-            ))}
-
-            {currentUser ? (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleNavigate('/profile')}
-                  className={
-                    location.pathname === '/profile'
-                      ? 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700'
-                      : 'hover:bg-purple-50'
-                  }
-                >
-                  <UserIcon className="w-4 h-4 mr-2" />
-                  Profile
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    onLogout();
-                    handleNavigate('/');
-                  }}
-                  className="hover:bg-red-50 hover:text-red-600"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <Button
-                onClick={() => setShowAuthModal(true)}
-                className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-600 text-white"
-              >
-                Login / Register
-              </Button>
-            )}
-          </div>
-
-          {/* MOBILE NAV */}
-          <div className="lg:hidden">
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-
-              <SheetContent side="right" className="w-64">
-                <div className="flex flex-col gap-2 mt-8">
-                  {navItems.map((item) => (
-                    <Button
-                      key={item.id}
-                      variant="ghost"
-                      onClick={() => {
-                        handleNavigate('/' + (item.id === 'home' ? '' : item.id));
-                        setMobileMenuOpen(false);
-                      }}
-                      className="justify-start"
-                    >
-                      <item.icon className="w-4 h-4 mr-2" />
+                  <button
+                    onClick={() =>
+                      handleNavigate("/" + (item.id === "home" ? "" : item.id))
+                    }
+                    className={`
+                      relative px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-300
+                      ${isActive(item.id === "home" ? "/" : "/" + item.id)
+                        ? "text-white bg-white/10"
+                        : "text-[#F8FAFC] hover:text-white hover:bg-white/5"
+                      }
+                    `}
+                  >
+                    {isActive(item.id === "home" ? "/" : "/" + item.id) && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 bg-white/10 rounded-xl"
+                        transition={{
+                          type: "spring",
+                          bounce: 0.2,
+                          duration: 0.6,
+                        }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2">
+                      <item.icon className="w-4 h-4" strokeWidth={2.5} />
                       {item.label}
-                    </Button>
-                  ))}
+                    </span>
+                  </button>
+                </motion.div>
+              ))}
 
-                  {currentUser ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          handleNavigate('/profile');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="justify-start"
-                      >
-                        <UserIcon className="w-4 h-4 mr-2" />
-                        Profile
-                      </Button>
+              <div className="h-8 w-px bg-white/20 mx-2" />
 
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          onLogout();
-                          handleNavigate('/');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="justify-start text-red-600"
-                      >
-                        <LogOut className="w-4 h-4 mr-2" />
-                        Logout
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      onClick={() => {
-                        setShowAuthModal(true);
-                        setMobileMenuOpen(false);
-                      }}
-                      className="bg-gradient-to-r from-purple-600 to-pink-600"
-                    >
-                      Login / Register
-                    </Button>
-                  )}
+              {currentUser ? (
+                <div className="flex items-center gap-2">
+                  <motion.button
+                    onClick={() => handleNavigate("/profile")}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`
+                      px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2
+                      ${isActive("/profile")
+                        ? "bg-white/20 text-white shadow-lg"
+                        : "text-[#F8FAFC] hover:bg-white/10"
+                      }
+                    `}
+                  >
+                    <UserIcon className="w-4 h-4" strokeWidth={2.5} />
+                    {memberName}
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => {
+                      onLogout();
+                      handleNavigate("/");
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="p-2.5 rounded-xl text-red-400 hover:bg-red-500/20 transition-all"
+                  >
+                    <LogOut className="w-5 h-5" strokeWidth={2.5} />
+                  </motion.button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              ) : (
+                <motion.button
+                  onClick={() => setShowAuthModal(true)}
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow: "0 10px 30px -10px rgba(255, 255, 255, 0.3)",
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-6 py-2.5 bg-white/20 backdrop-blur-sm text-white font-bold rounded-xl shadow-md hover:bg-white/30 transition-all"
+                >
+                  Log in / Sign up
+                </motion.button>
+              )}
+            </nav>
+
+            {/* MOBILE MENU BUTTON */}
+            <div className="lg:hidden">
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    className="p-2 text-[#F8FAFC] hover:bg-white/10 rounded-xl transition-colors"
+                  >
+                    <Menu className="w-6 h-6" strokeWidth={2.5} />
+                  </motion.button>
+                </SheetTrigger>
+
+                <SheetContent
+                  side="right"
+                  className="w-60 bg-[#0F5132] border-l border-white/10"
+                >
+                  <div
+                    className="flex flex-col gap-2 mt-12"
+                    style={{ fontFamily: "'Montserrat', sans-serif" }}
+                  >
+                    {org && (
+                      <motion.div
+                        className="flex items-center gap-3 px-5 py-3 mb-4 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          handleNavigate("/");
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        <img
+                          src={org.logo_url}
+                          alt={org.name}
+                          className="w-10 h-10 rounded-lg object-cover ring-2 ring-white/20"
+                        />
+                        <div>
+                          <h3 className="text-sm font-bold text-white">
+                            {org.name}
+                          </h3>
+                          <p className="text-xs text-white/70">
+                            Book • Play • Win
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {navItems.map((item) => (
+                      <motion.button
+                        key={item.id}
+                        onClick={() => {
+                          handleNavigate(
+                            "/" + (item.id === "home" ? "" : item.id)
+                          );
+                          setMobileMenuOpen(false);
+                        }}
+                        whileHover={{ x: 5 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`
+                          flex items-center gap-3 px-5 py-3.5 rounded-xl font-bold text-left transition-all
+                          ${isActive(item.id === "home" ? "/" : "/" + item.id)
+                            ? "bg-white text-[#0F5132] shadow-lg"
+                            : "text-white hover:bg-white/10 hover:shadow-md"
+                          }
+                        `}
+                      >
+                        <item.icon className="w-5 h-5" strokeWidth={2.5} />
+                        {item.label}
+                      </motion.button>
+                    ))}
+
+                    <div className="h-px bg-white/10 my-3" />
+
+                    {currentUser ? (
+                      <>
+                        <motion.button
+                          onClick={() => {
+                            handleNavigate("/profile");
+                            setMobileMenuOpen(false);
+                          }}
+                          whileHover={{ x: 5 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center gap-3 px-5 py-3.5 rounded-xl font-bold text-white hover:bg-white/10 hover:shadow-md transition-all text-left"
+                        >
+                          <UserIcon className="w-5 h-5" strokeWidth={2.5} />
+                          <div>
+                            <p className="text-sm">Profile</p>
+                            <p className="text-xs text-white/50">
+                              {memberName}
+                            </p>
+                          </div>
+                        </motion.button>
+
+                        <motion.button
+                          onClick={() => {
+                            onLogout();
+                            handleNavigate("/");
+                            setMobileMenuOpen(false);
+                          }}
+                          whileHover={{ x: 5 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center gap-3 px-5 py-3.5 rounded-xl font-bold text-red-300 hover:bg-red-500/20 hover:text-red-200 hover:shadow-md transition-all"
+                        >
+                          <LogOut className="w-5 h-5" strokeWidth={2.5} />
+                          Logout
+                        </motion.button>
+                      </>
+                    ) : (
+                      <motion.button
+                        onClick={() => {
+                          setShowAuthModal(true);
+                          setMobileMenuOpen(false);
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="mx-5 py-3.5 bg-white/20 backdrop-blur-sm text-white font-bold rounded-xl shadow-md hover:bg-white/30 hover:shadow-xl transition-all"
+                      >
+                        Log in / Sign up
+                      </motion.button>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
       </motion.header>
@@ -204,8 +374,8 @@ export function Header({ currentUser, onLogin, onLogout }: HeaderProps) {
       <AuthModal
         open={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        onLogin={onLogin}
+        onLogin={handleLoginSuccess}
       />
-    </>
+    </div>
   );
 }
