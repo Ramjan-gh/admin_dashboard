@@ -614,7 +614,6 @@ export function HomePage({ currentUser, onBookingComplete }: HomePageProps) {
           </div>
         </div>
 
-        <Footer />
       </div>
     </div>
   );

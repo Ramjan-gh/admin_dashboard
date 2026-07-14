@@ -25,9 +25,9 @@ export function BookingPopup({ isOpen, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-[95vw] h-[95vh] shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg w-full max-w-[95vw] h-[95vh] shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-purple-600 flex-shrink-0">
+        <div className="p-4 flex justify-between items-center bg-blue-500 flex-shrink-0">
           <h2 className="text-xl font-bold text-white">
             {confirmedData ? "Receipt Summary" : "Create New Booking"}
           </h2>

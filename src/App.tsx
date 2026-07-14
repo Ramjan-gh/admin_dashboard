@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  Outlet,
 } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
@@ -14,12 +15,49 @@ import { SlotsPage } from "./components/SlotsPage";
 import { TurfsPage } from "./components/TurfsPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
+import { SlotOverviewPage } from "./components/slotOverviewPageFolder/SlotOverviewPage";
 import { Toaster } from "sonner";
 import {
   getRefreshToken,
   clearSession,
   refreshSession,
 } from "./authutils";
+
+type ProtectedLayoutProps = {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  onLogout: () => void;
+};
+
+function ProtectedLayout({
+  sidebarOpen,
+  setSidebarOpen,
+  onLogout,
+}: ProtectedLayoutProps) {
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        onLogout={onLogout}
+      />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar setSidebarOpen={setSidebarOpen} onLogout={onLogout} />
+        <main className="flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
+      </div>
+
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -86,84 +124,58 @@ export default function App() {
 
         {/* ── Protected ──────────────────────────────────────────────────── */}
         <Route
-          path="/*"
           element={
             isAuthenticated ? (
-              <div className="flex h-screen bg-gray-50">
-                <Sidebar
-                  sidebarOpen={sidebarOpen}
-                  setSidebarOpen={setSidebarOpen}
-                  onLogout={handleLogout}
-                />
-
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <TopBar
-                    setSidebarOpen={setSidebarOpen}
-                    onLogout={handleLogout}
-                  />
-                  <main className="flex-1 overflow-y-auto">
-                    <Routes>
-                      <Route
-                        path="/"
-                        element={
-                          <DashboardHome
-                            onSessionExpired={handleSessionExpired}
-                          />
-                        }
-                      />
-                      <Route
-                        path="/bookings"
-                        element={
-                          <BookingsPage
-                            onSessionExpired={handleSessionExpired}
-                          />
-                        }
-                      />
-                      <Route
-                        path="/slots"
-                        element={
-                          <SlotsPage onSessionExpired={handleSessionExpired} />
-                        }
-                      />
-                      <Route
-                        path="/turfs"
-                        element={
-                          <TurfsPage onSessionExpired={handleSessionExpired} />
-                        }
-                      />
-                      <Route
-                        path="/settings"
-                        element={
-                          <SettingsPage
-                            onSessionExpired={handleSessionExpired}
-                          />
-                        }
-                      />
-                      <Route
-                        path="/profile"
-                        element={
-                          <ProfilePage
-                            onSessionExpired={handleSessionExpired}
-                          />
-                        }
-                      />
-                      <Route path="*" element={<Navigate to="/" />} />
-                    </Routes>
-                  </main>
-                </div>
-
-                {sidebarOpen && (
-                  <div
-                    className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
-                    onClick={() => setSidebarOpen(false)}
-                  />
-                )}
-              </div>
+              <ProtectedLayout
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                onLogout={handleLogout}
+              />
             ) : (
-              <Navigate to="/login" />
+              <Navigate to="/login" replace />
             )
           }
-        />
+        >
+          <Route
+            index
+            element={
+              <DashboardHome onSessionExpired={handleSessionExpired} />
+            }
+          />
+          <Route
+            path="bookings"
+            element={
+              <BookingsPage onSessionExpired={handleSessionExpired} />
+            }
+          />
+          <Route
+            path="slots"
+            element={<SlotsPage onSessionExpired={handleSessionExpired} />}
+          />
+          <Route
+            path="slot-overview"
+            element={
+              <SlotOverviewPage onSessionExpired={handleSessionExpired} />
+            }
+          />
+          <Route
+            path="turfs"
+            element={<TurfsPage onSessionExpired={handleSessionExpired} />}
+          />
+          <Route
+            path="settings"
+            element={
+              <SettingsPage onSessionExpired={handleSessionExpired} />
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <ProfilePage onSessionExpired={handleSessionExpired} />
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     </Router>
   );

@@ -7,6 +7,7 @@ import {
   LogOut,
   UserCircle,
   LandPlot,
+  Grid3x3,
 } from "lucide-react";
 import { NavLink } from "react-router-dom"; // Import NavLink
 
@@ -32,6 +33,7 @@ export function Sidebar({
     { id: "", label: "Dashboard", icon: LayoutDashboard }, // ID empty for home route
     { id: "bookings", label: "Bookings", icon: Calendar },
     { id: "slots", label: "Shifts & Slots", icon: Clock },
+    { id: "slot-overview", label: "Slot Overview", icon: Grid3x3 },
     { id: "turfs", label: "Fields", icon: LandPlot },
     { id: "profile", label: "My Profile", icon: UserCircle },
     { id: "settings", label: "Settings", icon: Settings },
@@ -76,7 +78,8 @@ export function Sidebar({
               return (
                 <NavLink
                   key={item.id}
-                  to={`/${item.id}`}
+                  to={item.id ? `/${item.id}` : "/"}
+                  end={!item.id}
                   onClick={() => setSidebarOpen(false)}
                   className={({ isActive }) => `
                     w-full flex items-center gap-3 px-4 py-3 rounded-lg
