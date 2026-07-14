@@ -112,10 +112,10 @@ export function SlotOverviewGrid({ dates, rows, cells }: Props) {
               {dates.map((date) => (
                 <th
                   key={date}
-                  className="border-b border-gray-200 px-1 py-2 sm:px-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-gray-600 min-w-[44px] sm:min-w-[72px] bg-gray-50"
+                  className="border-b border-r border-gray-200 px-1 py-2 sm:px-2 sm:py-3 text-center text-[10px] sm:text-xs font-semibold text-gray-600 min-w-[44px] sm:min-w-[72px] bg-gray-50"
                 >
-                  <span className="sm:hidden">{formatDateHeader(date, true)}</span>
-                  <span className="hidden sm:inline">{formatDateHeader(date, false)}</span>
+                  {/* <span className="sm:hidden">{formatDateHeader(date, true)}</span> */}
+                  <span className="">{formatDateHeader(date, false)}</span>
                 </th>
               ))}
             </tr>
@@ -141,7 +141,7 @@ export function SlotOverviewGrid({ dates, rows, cells }: Props) {
                       style={{ boxShadow: "2px 0 4px -2px rgba(0,0,0,0.08)" }}
                     >
                       <span className="block sm:hidden">
-                        {row.startTime}
+                      {row.startTime} – {row.endTime}
                       </span>
                       <span className="hidden sm:block">
                         {row.startTime} – {row.endTime}
