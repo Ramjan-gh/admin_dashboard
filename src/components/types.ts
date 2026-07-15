@@ -147,6 +147,7 @@ export type Slot = {
   type: string;
   status: "available" | "booked" | "maintenance";
   booking_code: string | null;
+  maintenance_id: string | null;
   full_name: string | null;
 };
 export type Shift = { shift_id: string; shift_name: string };
@@ -278,6 +279,8 @@ export interface FilterBarProps {
   setFieldDropdownOpen: (open: boolean) => void;
   onSelectField: (id: string) => void;
 }
+
+export type SlotStatus = "available" | "booked" | "maintenance";
 
 // SlotCard.tsx types
 export interface SlotCardProps {

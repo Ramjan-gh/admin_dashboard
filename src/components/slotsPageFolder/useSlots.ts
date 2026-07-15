@@ -42,20 +42,50 @@ export function useSlots(onSessionExpired: () => void) {
     if (!selectedFieldId || !selectedDate) return;
     setLoading(true);
     try {
+      // 1. Updated API payload to send start and end dates instead of single booking date
       const res = await post("get_slots_with_booking_details", {
         p_field_id: selectedFieldId,
-        p_booking_date: selectedDate,
+        p_start_date: selectedDate,
+        p_end_date: selectedDate,
       });
-      const data = await res.json();
-      setShifts(data.map((g: any) => ({ shift_id: g.shift_id, shift_name: g.shift_name })));
-      setSlots(data.flatMap((group: any) =>
-        group.slots.map((slot: any) => ({
-          ...slot,
-          field_id: selectedFieldId,
-          shift_id: group.shift_id,
-          type: group.shift_name,
-        }))
+
+      const payload = await res.json();
+
+      // 2. Adjust data extraction depending on backend structure wrapping.
+      // If the response wraps the data inside an array array like [{ date: "...", data: [...] }],
+      // we extract the data block. Otherwise, fall back to the raw response object.
+      const dayData = Array.isArray(payload) && payload[0]?.data ? payload[0].data : payload;
+
+      setShifts(dayData.map((g: any) => ({ shift_id: g.shift_id, shift_name: g.shift_name })));
+      setSlots(dayData.flatMap((group: any) =>
+        group.slots.map((slot: any) => {
+          // Each slot carries a `dates` array (one entry per date requested).
+          // Since we always request a single day here, pull that day's
+          // status/booking/maintenance info up onto the slot itself —
+          // otherwise slot.status, slot.full_name, slot.maintenance_id, etc.
+          // are all undefined and every downstream check (booked display,
+          // maintenance toggle) silently fails.
+          const dateInfo =
+            slot.dates?.find((d: any) => d.date === selectedDate) ?? slot.dates?.[0] ?? {};
+
+          return {
+            slot_id: slot.slot_id,
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            duration_minutes: slot.duration_minutes,
+            field_id: selectedFieldId,
+            shift_id: group.shift_id,
+            type: group.shift_name,
+            status: dateInfo.status ?? "available",
+            price: dateInfo.price,
+            full_name: dateInfo.full_name ?? null,
+            booking_code: dateInfo.booking_code ?? null,
+            maintenance_id: dateInfo.maintenance_id ?? null,
+          };
+        })
       ));
+    } catch (err) {
+      console.error("Fetch slots error:", err);
     } finally {
       setLoading(false);
     }
@@ -155,7 +185,7 @@ export function useSlots(onSessionExpired: () => void) {
         ? "remove_slot_from_maintenance"
         : "reserve_slot_for_maintenance";
       const body = isMaintenance
-        ? { p_maintenance_id: (slot as any).maintenance_id }
+        ? { p_maintenance_id: slot.maintenance_id }
         : { p_slot_id: slot.slot_id, p_date: selectedDate };
       const res = await post(endpoint, body);
       const data = await res.json().catch(() => ({}));

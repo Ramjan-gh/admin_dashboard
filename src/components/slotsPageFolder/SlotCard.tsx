@@ -1,7 +1,13 @@
 import { Trash2, Ban } from "lucide-react";
+import { Slot, SlotStatus } from "../types";
 
-// Type 
-import { SlotCardProps } from "../types";
+export interface SlotCardProps {
+  slot: Slot;
+  onDelete: (slotId: string) => void;
+  onToggleMaintenance: () => void;
+  formatTime: (time: string) => string;
+  getStatusColor: (status: SlotStatus) => string;
+}
 
 export function SlotCard({
   slot,

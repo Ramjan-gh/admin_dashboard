@@ -32,7 +32,6 @@ import {
   type FieldUtilizationItem,
   type UserVsGuestItem,
 } from "../../src/components/utils/analytics-api";
-import { b } from "framer-motion/dist/types.d-a9pt5qxk";
 import { UserVsGuestPieChart } from "./UserVsGuestPieChart";
 
 interface AnalyticsContentProps {
@@ -298,7 +297,7 @@ export function AnalyticsContent({
               </ResponsiveContainer>
             </div>
 
-            {/* <div className="mt-4 flex items-center gap-6 text-xs">
+            <div className="mt-4 flex items-center gap-6 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
                 <span className="text-gray-600">Peak Hours</span>
@@ -311,7 +310,7 @@ export function AnalyticsContent({
                 <div className="w-3 h-3 rounded-full bg-gray-400" />
                 <span className="text-gray-600">Off-Peak</span>
               </div>
-            </div> */}
+            </div>
           </div>
         </div>
 
@@ -915,46 +914,9 @@ export function AnalyticsContent({
       <div className="space-y-6">
         {/* Customer Segments */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <h4 className="text-gray-900 mb-4">New vs Returning Customers</h4>
-            <div className="space-y-4">
-              {customerSegmentsData.map((segment, idx) => (
-                <div key={idx} className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-700 font-medium">
-                      {segment.segment} Customers
-                    </span>
-                    <span className="text-2xl text-gray-900 font-semibold">
-                      {segment.count}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${segment.percentage}%`,
-                        background:
-                          idx === 0
-                            ? "linear-gradient(to right, #3b82f6, #8b5cf6)"
-                            : "linear-gradient(to right, #ec4899, #f97316)",
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">
-                      {segment.percentage}% of total
-                    </span>
-                    <span className="text-gray-700 font-medium">
-                      ৳{segment.revenue.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          
           {/* user vs guest customers */}
           <div>
-            <h4 className="text-gray-900 mb-4">User vs Guest Customers</h4>
             <UserVsGuestPieChart userVsGuestData={userVsGuestData} />
           </div>
         </div>

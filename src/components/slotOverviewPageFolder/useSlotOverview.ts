@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Field, Slot } from "../types";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Field } from "../types";
 import { authFetch } from "../authutils";
 
 const BASE_URL = "https://himsgwtkvewhxvmjapqa.supabase.co";
@@ -19,6 +19,30 @@ export type OverviewCell = {
   status: SlotStatus;
   bookingCode: string | null;
   fullName: string | null;
+  price?: number;
+};
+
+interface ApiSlotDate {
+  date: string;
+  price: number;
+  status: SlotStatus;
+  full_name: string | null;
+  booking_code: string | null;
+  maintenance_id: string | null;
+}
+
+interface ApiSlot {
+  slot_id: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  dates: ApiSlotDate[];
+}
+
+type ShiftGroup = {
+  shift_id: string;
+  shift_name: string;
+  slots: ApiSlot[];
 };
 
 function addMonths(date: Date, months: number): Date {
@@ -37,31 +61,14 @@ function getDefaultRange() {
   return { from: toISODate(from), to: toISODate(to) };
 }
 
-export function getDatesInRange(from: string, to: string): string[] {
-  const dates: string[] = [];
-  const current = new Date(from + "T00:00:00");
-  const end = new Date(to + "T00:00:00");
-  if (current > end) return dates;
-
-  while (current <= end) {
-    dates.push(toISODate(current));
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
-
 function formatTime(t: string) {
   return t.slice(0, 5);
 }
 
-type ShiftGroup = {
-  shift_id: string;
-  shift_name: string;
-  slots: Slot[];
-};
-
 export function useSlotOverview(onSessionExpired: () => void) {
-  const defaultRange = getDefaultRange();
+  // Computed once; only used as the initial useState value below.
+  const defaultRange = useMemo(() => getDefaultRange(), []);
+
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState("");
   const [dateFrom, setDateFrom] = useState(defaultRange.from);
@@ -70,6 +77,13 @@ export function useSlotOverview(onSessionExpired: () => void) {
   const [dates, setDates] = useState<string[]>([]);
   const [rows, setRows] = useState<OverviewSlotRow[]>([]);
   const [cells, setCells] = useState<Record<string, OverviewCell>>({});
+
+  // Keep the latest onSessionExpired without letting it change `post`'s
+  // identity on every render (callers often pass an inline function).
+  const onSessionExpiredRef = useRef(onSessionExpired);
+  useEffect(() => {
+    onSessionExpiredRef.current = onSessionExpired;
+  }, [onSessionExpired]);
 
   const getHeaders = useCallback(
     () => ({
@@ -88,9 +102,9 @@ export function useSlotOverview(onSessionExpired: () => void) {
           headers: getHeaders(),
           body: body ? JSON.stringify(body) : undefined,
         },
-        onSessionExpired,
+        () => onSessionExpiredRef.current(),
       ),
-    [getHeaders, onSessionExpired],
+    [getHeaders],
   );
 
   const fetchFields = useCallback(async () => {
@@ -98,77 +112,56 @@ export function useSlotOverview(onSessionExpired: () => void) {
       const res = await post("get_fields");
       const data: Field[] = await res.json();
       setFields(data);
-      if (data.length > 0 && !selectedFieldId) {
-        setSelectedFieldId(data[0].id);
-      }
+      // Functional update: only fill in a default if nothing is selected yet,
+      // without needing selectedFieldId as a dependency of this callback.
+      setSelectedFieldId((current) => current || (data[0]?.id ?? ""));
     } catch (err) {
       console.error("Fetch fields error:", err);
     }
-  }, [post, selectedFieldId]);
+  }, [post]);
 
   const fetchOverview = useCallback(async () => {
     if (!selectedFieldId || !dateFrom || !dateTo) return;
     if (dateFrom > dateTo) return;
 
-    const rangeDates = getDatesInRange(dateFrom, dateTo);
-    if (rangeDates.length === 0) return;
-
     setLoading(true);
     try {
-      const results = await Promise.all(
-        rangeDates.map(async (date) => {
-          const res = await post("get_slots_with_booking_details", {
-            p_field_id: selectedFieldId,
-            p_booking_date: date,
-          });
-          const data: ShiftGroup[] = await res.json();
-          return { date, data };
-        }),
-      );
+      const res = await post("get_slots_with_booking_details", {
+        p_field_id: selectedFieldId,
+        p_start_date: dateFrom,
+        p_end_date: dateTo,
+      });
+      const data: ShiftGroup[] = await res.json();
 
-      const shiftColorMap = new Map<string, number>();
-      let colorIndex = 0;
-      const slotRowMap = new Map<string, OverviewSlotRow>();
+      const dateSet = new Set<string>();
+      const newRows: OverviewSlotRow[] = [];
       const newCells: Record<string, OverviewCell> = {};
 
-      for (const { date, data } of results) {
-        for (const group of data) {
-          if (!shiftColorMap.has(group.shift_id)) {
-            shiftColorMap.set(group.shift_id, colorIndex++);
-          }
-          const shiftColorIndex = shiftColorMap.get(group.shift_id)!;
+      data.forEach((group, shiftColorIndex) => {
+        group.slots.forEach((slot) => {
+          newRows.push({
+            slotId: slot.slot_id,
+            shiftId: group.shift_id,
+            shiftName: group.shift_name,
+            startTime: formatTime(slot.start_time),
+            endTime: formatTime(slot.end_time),
+            shiftColorIndex,
+          });
 
-          for (const slot of group.slots) {
-            const slotId = slot.slot_id;
-            if (!slotRowMap.has(slotId)) {
-              slotRowMap.set(slotId, {
-                slotId,
-                shiftId: group.shift_id,
-                shiftName: group.shift_name,
-                startTime: formatTime(slot.start_time),
-                endTime: formatTime(slot.end_time),
-                shiftColorIndex,
-              });
-            }
-            const key = `${slotId}_${date}`;
-            newCells[key] = {
-              status: slot.status as SlotStatus,
-              bookingCode: slot.booking_code ?? null,
-              fullName: slot.full_name ?? null,
+          slot.dates.forEach((d) => {
+            dateSet.add(d.date);
+            newCells[`${slot.slot_id}_${d.date}`] = {
+              status: d.status,
+              bookingCode: d.booking_code,
+              fullName: d.full_name,
+              price: d.price,
             };
-          }
-        }
-      }
-
-      const sortedRows = Array.from(slotRowMap.values()).sort((a, b) => {
-        if (a.shiftColorIndex !== b.shiftColorIndex) {
-          return a.shiftColorIndex - b.shiftColorIndex;
-        }
-        return a.startTime.localeCompare(b.startTime);
+          });
+        });
       });
 
-      setDates(rangeDates);
-      setRows(sortedRows);
+      setDates(Array.from(dateSet).sort());
+      setRows(newRows);
       setCells(newCells);
     } catch (err) {
       console.error("Fetch overview error:", err);
@@ -177,6 +170,8 @@ export function useSlotOverview(onSessionExpired: () => void) {
     }
   }, [selectedFieldId, dateFrom, dateTo, post]);
 
+  // Fields only need to be fetched once on mount now that `post` and
+  // `fetchFields` no longer change identity on every field selection.
   useEffect(() => {
     fetchFields();
   }, [fetchFields]);
