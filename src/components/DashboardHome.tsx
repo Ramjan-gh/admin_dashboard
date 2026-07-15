@@ -9,6 +9,7 @@ import {
   Activity,
   UserCheck,
   Target,
+  ChevronDown,
 } from "lucide-react";
 import { RevenueTrendChart } from "./RevenueTrendChart";
 import { RevenueDistributionPie } from "./RevenueDistributionPie";
@@ -252,8 +253,68 @@ export function DashboardHome({ onSessionExpired }: Props) {
 
           {/* Analytics Tabs */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="border-b border-gray-100 px-6">
-              <div className="flex space-x-8">
+            <div className="border-b border-gray-100 px-6 py-3 md:py-0">
+              {/* Mobile Custom Dropdown Menu */}
+              {(() => {
+                const tabsList = [
+                  { id: "revenue", label: "Revenue", icon: DollarSign },
+                  { id: "bookings", label: "Bookings", icon: Activity },
+                  { id: "customers", label: "Customers", icon: UserCheck },
+                  { id: "operations", label: "Operations", icon: Target },
+                ];
+                const currentTab = tabsList.find((t) => t.id === analyticsTab) || tabsList[0];
+
+                return (
+                  <details className="block md:hidden relative w-full max-w-xs group">
+                    {/* Dropdown Trigger */}
+                    <summary className="list-none [&::-webkit-details-marker]:hidden flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50/50 pl-4 pr-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-gray-300 focus:outline-none cursor-pointer select-none active:scale-[0.99]">
+                      <span className="flex items-center gap-2.5">
+                        <currentTab.icon size={16} className="text-gray-400" />
+                        {currentTab.label}
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        strokeWidth={2.5}
+                        className="text-gray-400 transition-transform duration-200 group-open:rotate-180"
+                      />
+                    </summary>
+
+                    {/* Invisible backdrop to close menu when clicking outside */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}
+                    />
+
+                    {/* Premium Floating Options Panel */}
+                    <div className="absolute left-0 right-0 mt-2 z-20 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
+                      {tabsList.map((t) => {
+                        const isSelected = analyticsTab === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={(e) => {
+                              setAnalyticsTab(t.id as any);
+                              // Programmatically close the details menu on click
+                              e.currentTarget.closest("details")?.removeAttribute("open");
+                            }}
+                            className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isSelected
+                                ? "bg-blue-50 text-blue-600 font-semibold"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              }`}
+                          >
+                            <t.icon size={16} className={isSelected ? "text-blue-500" : "text-gray-400"} />
+                            {t.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </details>
+                );
+              })()}
+
+              {/* Desktop Regular Tabs */}
+              <div className="hidden md:flex space-x-8">
                 {[
                   { id: "revenue", label: "Revenue", icon: DollarSign },
                   { id: "bookings", label: "Bookings", icon: Activity },
@@ -263,11 +324,10 @@ export function DashboardHome({ onSessionExpired }: Props) {
                   <button
                     key={t.id}
                     onClick={() => setAnalyticsTab(t.id as any)}
-                    className={`py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${
-                      analyticsTab === t.id
-                        ? "blue-500"
+                    className={`py-4 text-sm font-medium border-b-2 transition-all flex items-center gap-2 ${analyticsTab === t.id
+                        ? "border-blue-500 text-blue-600"
                         : "border-transparent text-gray-400 hover:text-gray-600"
-                    }`}
+                      }`}
                   >
                     <t.icon size={16} />
                     {t.label}
