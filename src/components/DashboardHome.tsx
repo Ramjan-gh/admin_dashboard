@@ -205,31 +205,44 @@ export function DashboardHome({ onSessionExpired }: Props) {
           </p>
         </div>
 
-        {/* Date Range Picker */}
-        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-          <Calendar className="w-4 h-4 text-gray-400 ml-2 hidden sm:block" />
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="text-sm border-none focus:ring-0 w-full sm:w-auto"
-            />
-            <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="text-sm border-none focus:ring-0 w-full sm:w-auto"
-            />
-          </div>
-          <button
-            onClick={fetchData}
-            className="p-2 hover:bg-blue-50 rounded-lg text-blue-500 transition-colors self-center sm:self-auto"
-          >
-            <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
-          </button>
-        </div>
+        {/* Date Range Picker Container */}
+        <div className="flex flex-col items-start gap-1 w-full sm:w-auto">
+  <p className="text-xs text-slate-500">
+    Click either date to change the date range.
+  </p>
+
+  <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-xl px-3 py-2 transition-all duration-200 w-full sm:w-auto">
+    <Calendar className="w-4 h-4 text-slate-500 flex-shrink-0" />
+
+    <div className="flex items-center gap-2 w-full sm:w-auto">
+      <div className="relative w-full sm:w-32">
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+          className="w-full bg-transparent text-sm font-medium text-slate-700 cursor-pointer outline-none border-none focus:ring-0"
+          title="Select start date"
+        />
+      </div>
+
+      <span className="text-slate-400 text-sm font-medium select-none">
+        →
+      </span>
+
+      <div className="relative w-full sm:w-32">
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+          className="w-full bg-transparent text-sm font-medium text-slate-700 cursor-pointer outline-none border-none focus:ring-0"
+          title="Select end date"
+        />
+      </div>
+    </div>
+  </div>
+</div>
       </div>
 
       {error ? (

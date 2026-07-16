@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useLayoutEffect, useState, useEffect, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -54,6 +54,104 @@ interface AnalyticsContentProps {
   onFieldChange: (id: string) => void;
 }
 
+// Shared, nicely-styled field selector used across the dashboard.
+// Keeping one implementation means every "select a field" control looks and behaves the same.
+function FieldDropdown({
+  fieldsList,
+  currentFieldId,
+  onSelect,
+  className = "",
+}: {
+  fieldsList: any[];
+  currentFieldId: string;
+  onSelect: (id: string) => void;
+  className?: string;
+}) {
+  // Deliberately NOT using <details>/<summary> here. Native <details> toggling is
+  // implemented differently across mobile browsers, and on some of them programmatically
+  // opening/closing it (or moving focus in/out of its content) can trigger the browser's
+  // own "scroll the interesting bit into view" behavior — which is the most likely source
+  // of the page jumping to the top when picking a field on a phone. A plain, fully
+  // React-controlled dropdown sidesteps all of that: nothing here is ever left to the
+  // browser's own scroll-management heuristics.
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const currentField =
+    (fieldsList || []).find((f) => f.id === currentFieldId) ||
+    fieldsList?.[0] || { name: "Select Field" };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className={`relative block w-full sm:w-64 ${className}`}>
+      {/* Dropdown Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50/50 pl-4 pr-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-gray-300 focus:outline-none cursor-pointer select-none active:scale-[0.99]"
+      >
+        <span className="truncate pr-2">{currentField.name}</span>
+        <ChevronDown
+          size={16}
+          strokeWidth={2.5}
+          className={`text-gray-400 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {/* Floating Options Panel — only in the DOM while open, absolutely positioned so
+          it never affects surrounding layout/height either way. */}
+      {open && (
+        <div className="absolute left-0 right-0 mt-2 z-20 max-h-60 overflow-y-auto rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
+          {(fieldsList || []).map((f) => {
+            const isSelected = currentFieldId === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onSelect(f.id);
+                }}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  isSelected
+                    ? "bg-blue-50 text-blue-600 font-semibold"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <span className="truncate">{f.name}</span>
+                {isSelected && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 ml-2" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Lives outside the component on purpose. If selecting a field causes the parent to
+// swap out (unmount + remount) this component while it refetches data — rather than
+// just re-rendering the same instance — a value stored in a ref or state would be
+// wiped out before it could be used to restore the scroll position. A module-level
+// variable survives that remount because it isn't tied to any component instance.
+let pendingScrollY: number | null = null;
+
 export function AnalyticsContent({
   weeksAnalyzed,
   tab,
@@ -73,6 +171,94 @@ export function AnalyticsContent({
   currentFieldId,
   onFieldChange,
 }: AnalyticsContentProps) {
+  // Keep the page exactly where the user is when a field is selected.
+  // Some data refreshes trigger a re-render/re-layout (or even a full remount of this
+  // component while new data loads) that the browser interprets as a reason to scroll
+  // back to the top, so we explicitly restore the scroll position.
+  const handleFieldChange = (id: string) => {
+    pendingScrollY = window.scrollY;
+    onFieldChange(id);
+  };
+
+  useLayoutEffect(() => {
+    if (pendingScrollY !== null) {
+      const y = pendingScrollY;
+      const restore = () => window.scrollTo(0, y);
+      restore();
+      // Restore again over the next ~800ms in case a slower connection means the
+      // data for the newly selected field (and any loading-state layout shift, or a
+      // full unmount/remount of this component) arrives after our first restore
+      // attempt — common on mobile networks.
+      const raf = requestAnimationFrame(restore);
+      const timeouts = [30, 100, 200, 350, 500, 800].map((ms) => setTimeout(restore, ms));
+      pendingScrollY = null;
+      return () => {
+        cancelAnimationFrame(raf);
+        timeouts.forEach(clearTimeout);
+      };
+    }
+    // Intentionally no dependency array restriction beyond what's needed to catch both
+    // a same-instance update AND a fresh mount after a remount — this runs after every
+    // render, but is a no-op whenever there's nothing pending.
+  });
+
+  // IMPORTANT: this hook must run on every render regardless of which tab is active.
+  // React requires the same hooks to be called in the same order on every render of a
+  // component instance — calling it only inside `if (tab === "revenue")` caused a
+  // "Rendered fewer hooks than expected" crash (and blank page) whenever the user
+  // switched to the "customers" or "operations" tab.
+  const weeklyPatternChart = useMemo(() => {
+    if (!revenueByDayOfWeek || revenueByDayOfWeek.length === 0) return [];
+
+    return [...revenueByDayOfWeek]
+      .sort((a, b) => a.day_of_week - b.day_of_week) // Ensures Sunday (0) to Saturday (6)
+      .map((item) => ({
+        day: item.day_name.substring(0, 3), // "Sunday" -> "Sun"
+        revenue: Number(item.total_revenue), // Ensure it's a number
+        bookings: item.total_bookings,
+        avgTicket: Number(item.avg_revenue_per_booking),
+      }));
+  }, [revenueByDayOfWeek]);
+
+  // Same reasoning as weeklyPatternChart above: this hook must always run, so it's
+  // lifted out of the `if (tab === "bookings")` branch and computes its own
+  // fallback-aware bookings data internally.
+  const stats = useMemo(() => {
+    const bookingVolumeTrendsData =
+      bookingVolumeTrends.length > 0
+        ? bookingVolumeTrends.map((item) => ({
+          date: item.booking_date,
+          bookings: item.total_bookings,
+          cancellations: item.cancelled_bookings,
+        }))
+        : [];
+
+    if (!bookingVolumeTrendsData || bookingVolumeTrendsData.length === 0) {
+      return { avgBookings: 0, avgCancelRate: 0 };
+    }
+
+    const totalBookings = bookingVolumeTrendsData.reduce(
+      (sum, item) => sum + (item.bookings || 0),
+      0,
+    );
+    const totalCancellations = bookingVolumeTrendsData.reduce(
+      (sum, item) => sum + (item.cancellations || 0),
+      0,
+    );
+
+    const avgBookings = Math.round(
+      totalBookings / bookingVolumeTrendsData.length,
+    );
+
+    // Calculate rate: (Total Cancellations / Total Bookings) * 100
+    const avgCancelRate =
+      totalBookings > 0
+        ? ((totalCancellations / totalBookings) * 100).toFixed(1)
+        : 0;
+
+    return { avgBookings, avgCancelRate };
+  }, [bookingVolumeTrends]);
+
   if (tab === "revenue") {
     // Transform API data for charts
     const revenueByFieldChart =
@@ -92,19 +278,6 @@ export function AnalyticsContent({
           { field: "Field C", revenue: 28000, bookings: 98, avgValue: 286 },
           { field: "Field D", revenue: 14000, bookings: 62, avgValue: 226 },
         ];
-
-    const weeklyPatternChart = useMemo(() => {
-      if (!revenueByDayOfWeek || revenueByDayOfWeek.length === 0) return [];
-
-      return [...revenueByDayOfWeek]
-        .sort((a, b) => a.day_of_week - b.day_of_week) // Ensures Sunday (0) to Saturday (6)
-        .map((item) => ({
-          day: item.day_name.substring(0, 3), // "Sunday" -> "Sun"
-          revenue: Number(item.total_revenue), // Ensure it's a number
-          bookings: item.total_bookings,
-          avgTicket: Number(item.avg_revenue_per_booking),
-        }));
-    }, [revenueByDayOfWeek]);
 
     const paymentMethodsChart: PaymentChartData[] =
       paymentMethods.length > 0
@@ -297,59 +470,12 @@ export function AnalyticsContent({
               <h4 className="text-gray-900 mb-4 text-base font-semibold sm:text-lg">Revenue by Time Slot</h4>
     
               {/* Dynamic Field Dropdown */}
-{(() => {
-  const currentField = (fieldsList || []).find((f) => f.id === currentFieldId) || fieldsList?.[0] || { name: 'Select Field' };
-
-  return (
-    <details className="relative mb-6 block w-full sm:w-64 group">
-      {/* Dropdown Trigger */}
-      <summary className="list-none [&::-webkit-details-marker]:hidden flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50/50 pl-4 pr-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-gray-300 focus:outline-none cursor-pointer select-none active:scale-[0.99]">
-        <span className="truncate pr-2">
-          {currentField.name}
-        </span>
-        <ChevronDown
-          size={16}
-          strokeWidth={2.5}
-          className="text-gray-400 shrink-0 transition-transform duration-200 group-open:rotate-180"
-        />
-      </summary>
-
-      {/* Invisible backdrop to close menu when clicking outside */}
-      <div
-        className="fixed inset-0 z-10"
-        onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}
-      />
-
-      {/* Premium Floating Options Panel */}
-      <div className="absolute left-0 right-0 mt-2 z-20 max-h-60 overflow-y-auto rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
-        {(fieldsList || []).map((f) => {
-          const isSelected = currentFieldId === f.id;
-          return (
-            <button
-              key={f.id}
-              type="button"
-              onClick={(e) => {
-                onFieldChange && onFieldChange(f.id);
-                // Programmatically close the details menu on click
-                e.currentTarget.closest("details")?.removeAttribute("open");
-              }}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isSelected
-                  ? "bg-blue-50 text-blue-600 font-semibold"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`}
-            >
-              <span className="truncate">{f.name}</span>
-              {isSelected && (
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 ml-2" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </details>
-  );
-})()}
+              <FieldDropdown
+                fieldsList={fieldsList}
+                currentFieldId={currentFieldId}
+                onSelect={handleFieldChange}
+                className="mb-6"
+              />
     
               <div className="w-full h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -546,48 +672,102 @@ export function AnalyticsContent({
         <div>
           <h4 className="text-gray-900 mb-4 font-bold">Discount Code Performance</h4>
           {discountPerformanceTable && discountPerformanceTable.length > 0 ? (
-            <div className="overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-500 border-b border-gray-200 bg-gray-50/50">
-                    <th className="py-4 px-6 font-medium">Code</th>
-                    <th className="py-4 px-6 font-medium">Uses</th>
-                    <th className="py-4 px-6 font-medium">Revenue</th>
-                    <th className="py-4 px-6 font-medium">Discount Given</th>
-                    <th className="py-4 px-6 font-medium">ROI</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {discountPerformanceTable.map((disc, idx) => (
-                    <tr key={idx} className="text-sm border-b border-gray-50 last:border-0">
-                      <td className="py-4 px-6">
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                          {disc.code}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-gray-700">{disc.uses}</td>
-                      <td className="py-4 px-6 text-gray-900 font-medium">
-                        ৳{disc.revenue?.toLocaleString() || 0}
-                      </td>
-                      <td className="py-4 px-6 text-gray-700">
-                        ৳{disc.discount?.toLocaleString() || 0}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            disc.roi >= 5
-                              ? "bg-green-100 text-green-700" 
-                              : "bg-orange-100 text-orange-700"
-                          }`}
-                        >
-                          {disc.roi?.toFixed(1) || 0}x
-                        </span>
-                      </td>
+            <>
+              {/* Mobile: stacked cards (below sm) */}
+              <div className="sm:hidden space-y-3">
+                {discountPerformanceTable.map((disc, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white rounded-xl border border-gray-100 shadow-sm p-4"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                        {disc.code}
+                      </span>
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${
+                          disc.roi >= 5
+                            ? "bg-green-100 text-green-700"
+                            : "bg-orange-100 text-orange-700"
+                        }`}
+                      >
+                        {disc.roi?.toFixed(1) || 0}x ROI
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center border-t border-gray-50 pt-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">
+                          Uses
+                        </p>
+                        <p className="text-sm text-gray-900 font-semibold">
+                          {disc.uses}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">
+                          Revenue
+                        </p>
+                        <p className="text-sm text-gray-900 font-semibold">
+                          ৳{disc.revenue?.toLocaleString() || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">
+                          Discount
+                        </p>
+                        <p className="text-sm text-gray-900 font-semibold">
+                          ৳{disc.discount?.toLocaleString() || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* sm and up: full table */}
+              <div className="hidden sm:block overflow-x-auto bg-white rounded-2xl border border-gray-100 shadow-sm">
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-left text-sm text-gray-500 border-b border-gray-200 bg-gray-50/50">
+                      <th className="py-4 px-6 font-medium">Code</th>
+                      <th className="py-4 px-6 font-medium">Uses</th>
+                      <th className="py-4 px-6 font-medium">Revenue</th>
+                      <th className="py-4 px-6 font-medium">Discount Given</th>
+                      <th className="py-4 px-6 font-medium">ROI</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {discountPerformanceTable.map((disc, idx) => (
+                      <tr key={idx} className="text-sm border-b border-gray-50 last:border-0">
+                        <td className="py-4 px-6">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                            {disc.code}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-gray-700">{disc.uses}</td>
+                        <td className="py-4 px-6 text-gray-900 font-medium">
+                          ৳{disc.revenue?.toLocaleString() || 0}
+                        </td>
+                        <td className="py-4 px-6 text-gray-700">
+                          ৳{disc.discount?.toLocaleString() || 0}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              disc.roi >= 5
+                                ? "bg-green-100 text-green-700"
+                                : "bg-orange-100 text-orange-700"
+                            }`}
+                          >
+                            {disc.roi?.toFixed(1) || 0}x
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <div className="text-center py-8 text-gray-500 bg-white rounded-2xl border border-gray-100 shadow-sm">
               <p>No discount code data available for the selected period.</p>
@@ -631,32 +811,8 @@ export function AnalyticsContent({
           /* Your fallback mock data stays here */
         ];
 
-    const stats = React.useMemo(() => {
-      if (!bookingVolumeTrendsData || bookingVolumeTrendsData.length === 0) {
-        return { avgBookings: 0, avgCancelRate: 0 };
-      }
-
-      const totalBookings = bookingVolumeTrendsData.reduce(
-        (sum, item) => sum + (item.bookings || 0),
-        0,
-      );
-      const totalCancellations = bookingVolumeTrendsData.reduce(
-        (sum, item) => sum + (item.cancellations || 0),
-        0,
-      );
-
-      const avgBookings = Math.round(
-        totalBookings / bookingVolumeTrendsData.length,
-      );
-
-      // Calculate rate: (Total Cancellations / Total Bookings) * 100
-      const avgCancelRate =
-        totalBookings > 0
-          ? ((totalCancellations / totalBookings) * 100).toFixed(1)
-          : 0;
-
-      return { avgBookings, avgCancelRate };
-    }, [bookingVolumeTrendsData]);
+    // `stats` is computed once at the top level (see above) so hooks stay
+    // consistent across tab switches — no local recomputation needed here.
 
     const fieldUtilizationData =
       fieldUtilization.length > 0
@@ -680,7 +836,10 @@ export function AnalyticsContent({
         </h4>
         <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={bookingVolumeTrendsData}>
+            <AreaChart
+              data={bookingVolumeTrendsData}
+              margin={{ top: 5, right: 8, left: -12, bottom: 0 }}
+            >
               <defs>
                 {/* Booking Gradient - Blue */}
                 <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
@@ -728,7 +887,7 @@ export function AnalyticsContent({
                 tickLine={false}
                 axisLine={false}
                 stroke="#9ca3af"
-                dx={-10}
+                width={32}
               />
 
               <Tooltip
@@ -800,31 +959,21 @@ export function AnalyticsContent({
 
         {/* Time Slot Heat Map Section */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <h4 className="text-gray-900 font-semibold text-lg">
               Popular Time Slots (Heat Map)
             </h4>
 
             {/* Dynamic Field Dropdown */}
-            <div className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-100 transition-all hover:bg-purple-100">
-              <span className="text-[10px] uppercase font-bold text-purple-400">
-                Select Field:
-              </span>
-              <select
-                value={currentFieldId}
-                onChange={(e) => onFieldChange(e.target.value)}
-                className="bg-transparent text-sm font-semibold text-purple-700 focus:ring-0 border-none p-0 cursor-pointer outline-none"
-              >
-                {fieldsList.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FieldDropdown
+              fieldsList={fieldsList}
+              currentFieldId={currentFieldId}
+              onSelect={handleFieldChange}
+              className="sm:w-56"
+            />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
             {(() => {
               // Logic for table headers and data normalization
               const uniqueTimeSlots = Array.from(
@@ -845,16 +994,16 @@ export function AnalyticsContent({
               );
 
               return (
-                <table className="w-full border-separate border-spacing-1">
+                <table className="border-separate border-spacing-1 min-w-[640px] w-full">
                   <thead>
                     <tr>
-                      <th className="text-left text-xs text-gray-400 uppercase font-bold p-2 w-24 tracking-wider">
+                      <th className="sticky left-0 z-10 bg-white text-left text-[10px] sm:text-xs text-gray-400 uppercase font-bold p-2 w-16 sm:w-24 tracking-wider">
                         Day
                       </th>
                       {uniqueTimeSlots.map((time) => (
                         <th
                           key={time}
-                          className="text-center text-xs text-gray-400 uppercase font-bold p-2 tracking-wider"
+                          className="text-center text-[10px] sm:text-xs text-gray-400 uppercase font-bold p-2 tracking-wider whitespace-nowrap"
                         >
                           {time}
                         </th>
@@ -870,8 +1019,8 @@ export function AnalyticsContent({
 
                       return (
                         <tr key={day}>
-                          <td className="text-sm text-gray-600 font-semibold p-2">
-                            {day}
+                          <td className="sticky left-0 z-10 bg-white text-xs sm:text-sm text-gray-600 font-semibold p-2 whitespace-nowrap">
+                            {day.slice(0, 3)}
                           </td>
                           {uniqueTimeSlots.map((slot) => {
                             const entry = dayData.find(
@@ -883,14 +1032,14 @@ export function AnalyticsContent({
                             return (
                               <td key={slot} className="p-0.5">
                                 <div
-                                  className="w-full h-14 rounded-lg flex flex-col items-center justify-center transition-all duration-200 hover:scale-[1.05] hover:shadow-md cursor-default border border-white/20"
+                                  className="w-12 h-10 sm:w-full sm:h-14 rounded-lg flex flex-col items-center justify-center transition-all duration-200 hover:scale-[1.05] hover:shadow-md cursor-default border border-white/20"
                                   style={{
                                     backgroundColor: `rgba(139, 92, 246, ${Math.max(intensity, 0.05)})`,
                                     color:
                                       intensity > 0.4 ? "white" : "#4b5563",
                                   }}
                                 >
-                                  <span className="text-sm font-bold">
+                                  <span className="text-xs sm:text-sm font-bold">
                                     {value}
                                   </span>
                                 </div>
@@ -1072,8 +1221,82 @@ export function AnalyticsContent({
       {/* Field Performance Comparison */}
       <div>
         <h4 className="text-gray-900 mb-4">Field Performance Comparison</h4>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+
+        {/* Mobile: stacked cards (below sm) */}
+        <div className="sm:hidden space-y-3">
+          {revenueByFieldChart.map((field, idx) => {
+            const util = fieldUtilizationChart.find(
+              (f) => f.field === field.field,
+            );
+            return (
+              <div
+                key={idx}
+                className="bg-white rounded-xl border border-gray-100 shadow-sm p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-gray-900 font-semibold text-sm">
+                    {field.field}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      (util?.utilization || 0) >= 70
+                        ? "bg-green-100 text-green-700"
+                        : (util?.utilization || 0) >= 50
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-orange-100 text-orange-700"
+                    }`}
+                  >
+                    {util?.utilization}% util.
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center border-t border-gray-50 pt-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">
+                      Revenue
+                    </p>
+                    <p className="text-sm text-gray-900 font-semibold">
+                      ৳{field.revenue.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">
+                      Bookings
+                    </p>
+                    <p className="text-sm text-gray-900 font-semibold">
+                      {field.bookings}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-0.5">
+                      Avg. Value
+                    </p>
+                    <p className="text-sm text-gray-900 font-semibold">
+                      ৳{field.avgValue}
+                    </p>
+                  </div>
+                </div>
+                {(idx === 0 || idx === revenueByFieldChart.length - 1) && (
+                  <div className="mt-3 pt-3 border-t border-gray-50">
+                    {idx === 0 && (
+                      <span className="text-green-600 text-xs font-medium">
+                        ⭐ Top Performer
+                      </span>
+                    )}
+                    {idx === revenueByFieldChart.length - 1 && (
+                      <span className="text-orange-600 text-xs font-medium">
+                        📊 Needs Attention
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* sm and up: full table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full min-w-[560px]">
             <thead>
               <tr className="text-left text-sm text-gray-500 border-b border-gray-200">
                 <th className="pb-3 font-medium">Field</th>
