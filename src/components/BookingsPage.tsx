@@ -252,7 +252,6 @@ export function BookingsPage({ onSessionExpired }: Props) {
           isOpen={showBookingPopup}
           onClose={() => {
             setShowBookingPopup(false);
-            toast.success("Booking created successfully!");
             fetchBookings();
           }}
         />

@@ -20,7 +20,7 @@ export function ProfilePage({ onSessionExpired }: Props) {
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left Column: Brief Stats */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">

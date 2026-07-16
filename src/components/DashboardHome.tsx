@@ -212,7 +212,7 @@ export function DashboardHome({ onSessionExpired }: Props) {
   </p>
 
   <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10 rounded-xl px-3 py-2 transition-all duration-200 w-full sm:w-auto">
-    <Calendar className="w-4 h-4 text-slate-500 flex-shrink-0" />
+    
 
     <div className="flex items-center gap-2 w-full sm:w-auto">
       <div className="relative w-full sm:w-32">

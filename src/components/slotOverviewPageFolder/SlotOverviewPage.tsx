@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Calendar, RefreshCw } from "lucide-react";
 import { useSlotOverview } from "./useSlotOverview";
 import { FieldSelectorGrid } from "./FieldSelectorGrid";
@@ -24,6 +25,10 @@ export function SlotOverviewPage({ onSessionExpired }: Props) {
     refresh,
   } = useSlotOverview(onSessionExpired);
 
+  // Initializing input refs for the full-block click trigger feature
+  const fromDateRef = useRef<HTMLInputElement>(null);
+  const toDateRef = useRef<HTMLInputElement>(null);
+
   const handleDateFromChange = (value: string) => {
     setDateFrom(value);
     if (value > dateTo) setDateTo(value);
@@ -42,49 +47,54 @@ export function SlotOverviewPage({ onSessionExpired }: Props) {
             Slot Overview
           </h1>
           <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
-            Quick view of booked, available & maintenance slots
+            Quick view of 
             {selectedField ? ` — ${selectedField.name}` : ""}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={loading}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50 w-full sm:w-auto touch-manipulation"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        
       </div>
 
       {/* Date range */}
       <div className="bg-white rounded-xl p-3 sm:p-4 border border-gray-100 shadow-sm mb-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Date Range</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label className="block">
+          
+          {/* From Date Input Wrapper */}
+          <div className="block">
             <span className="text-xs text-gray-500 mb-1 block">From</span>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+            <div 
+              className="relative flex items-center w-full cursor-pointer"
+              onClick={() => fromDateRef.current?.showPicker()}
+            >
+              <Calendar className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none z-10" />
               <input
+                ref={fromDateRef}
                 type="date"
                 value={dateFrom}
                 onChange={(e) => handleDateFromChange(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 w-full text-sm touch-manipulation"
+                className="border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 w-full text-sm touch-manipulation cursor-pointer [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0"
               />
             </div>
-          </label>
-          <label className="block">
+          </div>
+
+          {/* To Date Input Wrapper */}
+          <div className="block">
             <span className="text-xs text-gray-500 mb-1 block">To</span>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+            <div 
+              className="relative flex items-center w-full cursor-pointer"
+              onClick={() => toDateRef.current?.showPicker()}
+            >
+              <Calendar className="w-4 h-4 text-gray-400 absolute left-3 pointer-events-none z-10" />
               <input
+                ref={toDateRef}
                 type="date"
                 value={dateTo}
                 onChange={(e) => handleDateToChange(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 w-full text-sm touch-manipulation"
+                className="border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 w-full text-sm touch-manipulation cursor-pointer [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0"
               />
             </div>
-          </label>
+          </div>
+          
         </div>
         <p className="text-[11px] sm:text-xs text-gray-400 mt-2">
           {dates.length} day{dates.length !== 1 ? "s" : ""} selected

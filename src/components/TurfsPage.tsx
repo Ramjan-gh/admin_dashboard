@@ -70,6 +70,7 @@ export function TurfsPage({ onSessionExpired }: Props) {
           </Droppable>
         </DragDropContext>
 
+        <div className="">
         <TurfModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
@@ -81,6 +82,7 @@ export function TurfsPage({ onSessionExpired }: Props) {
           uploading={uploading}
           loading={loading}
         />
+        </div>
       </div>
     </>
   );

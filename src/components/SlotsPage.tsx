@@ -6,7 +6,6 @@ import { AddSlotModal } from "./slotsPageFolder/AddSlotModal";
 import { AddShiftModal } from "./slotsPageFolder/AddShiftModal";
 import { UpdateShiftModal } from "./slotsPageFolder/UpdateShiftModal";
 import { useSlots } from "./slotsPageFolder/useSlots";
-import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,18 +52,6 @@ export function SlotsPage({ onSessionExpired }: Props) {
 
   // --- UI Helpers ---
   const formatTime = (t: string) => t.slice(0, 5);
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "available":
-        return "border-green-300 bg-green-50 hover:bg-green-100";
-      case "booked":
-        return "border-orange-300 bg-orange-50";
-      case "maintenance":
-        return "border-red-300 bg-red-50";
-      default:
-        return "";
-    }
-  };
 
   // --- UI Event Wrappers ---
   const onAddSlotSubmit = async (shiftId: string) => {
@@ -97,7 +84,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
 
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
-      {/* Top Header Section: Stacks on mobile, stays clean on PC */}
+      {/* Top Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Slot Management</h1>
@@ -127,79 +114,94 @@ export function SlotsPage({ onSessionExpired }: Props) {
         }}
       />
 
-      <div className="space-y-6 mt-6">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-            <p>Loading availability...</p>
-          </div>
-        ) : (
-          shifts.map((shift) => (
-            <div
-              key={shift.shift_id}
-              className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100"
-            >
-              {/* Shift Control Strip: Wraps beautifully on mobile screens */}
-              <div className="flex flex-wrap gap-3 mb-4 justify-between items-center border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <h3 className="font-bold text-base sm:text-lg text-gray-700">
-                    {shift.shift_name}
-                  </h3>
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => {
-                        setSelectedShiftForEdit({
-                          id: shift.shift_id,
-                          name: shift.shift_name,
-                        });
-                        setUpdateShiftModalOpen(true);
-                      }}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
-                      title="Edit Shift"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteShift(shift.shift_id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-50 rounded-md transition-colors"
-                      title="Delete Shift"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setModalShiftId(shift.shift_id);
-                    setAddSlotModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-600 hover:text-white transition-all"
-                >
-                  <Plus className="w-4 h-4" /> Add Slot
-                </button>
-              </div>
-
-              {/* 🚀 THE FIXED GRID SYSTEM: Full width on tiny mobile, 2 columns on mobile layout, scales up cleanly on PC */}
-              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {slots
-                  .filter((s) => s.shift_id === shift.shift_id)
-                  .map((slot) => (
-                    <SlotCard
-                      key={slot.slot_id}
-                      slot={slot}
-                      onDelete={handleDeleteSlot}
-                      onToggleMaintenance={() => handleToggleMaintenance(slot)}
-                      formatTime={formatTime}
-                      getStatusColor={getStatusColor}
-                    />
-                  ))}
-              </div>
-            </div>
-          ))
-        )}
+      {/* Main Content Workspace Grid */}
+<div className="space-y-6 mt-6 min-h-[400px]">
+  {/* Only show skeletons if data is actively loading AND we don't have existing shifts cached in memory */}
+  {loading && shifts.length === 0 ? (
+    Array.from({ length: 2 }).map((_, shiftIdx) => (
+      <div
+        key={`shift-skeleton-${shiftIdx}`}
+        className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100"
+      >
+        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+          <div className="h-6 w-36 bg-slate-100 rounded-md animate-pulse" />
+          <div className="h-8 w-24 bg-slate-50 rounded-lg animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, slotIdx) => (
+            <SlotCard key={`slot-skeleton-${shiftIdx}-${slotIdx}`} isLoading={true} />
+          ))}
+        </div>
       </div>
+    ))
+  ) : (
+    /* Core Shift UI Blocks (Will remain unchanged on screen during toggle actions) */
+    shifts.map((shift) => (
+      <div
+        key={shift.shift_id}
+        className={`bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-gray-100 transition-opacity ${
+          loading ? "opacity-70 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className="flex flex-wrap gap-3 mb-4 justify-between items-center border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <h3 className="font-bold text-base sm:text-lg text-gray-700">
+              {shift.shift_name}
+            </h3>
+            <div className="flex items-center">
+              <button
+                onClick={() => {
+                  setSelectedShiftForEdit({
+                    id: shift.shift_id,
+                    name: shift.shift_name,
+                  });
+                  setUpdateShiftModalOpen(true);
+                }}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-50 rounded-md transition-colors"
+                title="Edit Shift"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteShift(shift.shift_id)}
+                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-50 rounded-md transition-colors"
+                title="Delete Shift"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setModalShiftId(shift.shift_id);
+              setAddSlotModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs sm:text-sm font-semibold hover:bg-blue-600 hover:text-white transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add Slot
+          </button>
+        </div>
 
-      {/* Modals */}
+        {/* Slot Cards Grid */}
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {slots
+            .filter((s) => s.shift_id === shift.shift_id)
+            .map((slot) => (
+              <SlotCard
+                key={slot.slot_id}
+                slot={slot}
+                onDelete={handleDeleteSlot}
+                onToggleMaintenance={() => handleToggleMaintenance(slot)}
+                formatTime={formatTime}
+              />
+            ))}
+        </div>
+      </div>
+    ))
+  )}
+</div>
+
+      {/* Modals Configuration */}
       <UpdateShiftModal
         isOpen={updateShiftModalOpen}
         onClose={() => setUpdateShiftModalOpen(false)}
@@ -225,7 +227,7 @@ export function SlotsPage({ onSessionExpired }: Props) {
 
       <AddShiftModal
         isOpen={addShiftModalOpen}
-        onClose={() => setAddSlotModalOpen(false)}
+        onClose={() => setAddShiftModalOpen(false)}
         onAdd={onAddShiftSubmit}
         fieldId={selectedFieldId}
         loading={isProcessing}

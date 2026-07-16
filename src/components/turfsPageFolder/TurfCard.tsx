@@ -15,92 +15,99 @@ export function TurfCard({ turf, index, onEdit, onDelete }: TurfCardProps) {
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`bg-white w-80 rounded-xl overflow-hidden border border-blue-100 shadow-sm transition-shadow ${
-            snapshot.isDragging ? "shadow-xl ring-2 ring-blue-500 z-50" : ""
+          className={`bg-white w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl rounded-xl overflow-hidden border border-gray-150 transition-all ${
+            snapshot.isDragging 
+              ? "shadow-xl ring-2 ring-blue-500 scale-[1.01] z-50" 
+              : "shadow-sm hover:shadow-md hover:border-gray-300"
           }`}
         >
-          {/* Compact Image Header */}
-          <div className="relative h-32 bg-gray-200">
-            <div
-              {...provided.dragHandleProps}
-              className="absolute top-2 right-2 z-10 p-1.5 bg-white/90 backdrop-blur-sm rounded-md cursor-grab active:cursor-grabbing hover:bg-white shadow-sm"
-            >
-              <GripVertical className="w-4 h-4 text-gray-500" />
-            </div>
-
-            <img
-              src={turf.background_image_url}
-              alt={turf.name}
-              className="w-full h-full object-cover"
-            />
-
-            {/* Display Order Badge */}
-            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm w-7 h-7 rounded-full flex justify-center items-center shadow-md border border-white">
-              <span className="text-gray-900 text-xs font-black">
-                {turf.display_order}
-              </span>
-            </div>
-
-            {/* Sport Icon Badge */}
-            <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm p-1.5 rounded-lg flex justify-center items-center shadow-md border border-white">
+          {/* Flex Container: Becomes a row layout on large screens to crush excessive vertical height */}
+          <div className="flex flex-col sm:flex-row h-full">
+            
+            {/* Image Section */}
+            <div className="relative h-28 sm:h-auto sm:w-2/5 md:w-1/3 min-h-[110px] bg-gray-100 shrink-0">
               <img
-                src={turf.icon_url}
-                className="w-5 h-5 object-contain"
-                alt="sport icon"
+                src={turf.background_image_url}
+                alt={turf.name}
+                className="w-full h-full object-cover"
               />
-            </div>
-          </div>
+              <div className="absolute inset-0 bg-gradient-to-t sm:bg-gradient-to-r from-black/40 via-transparent to-black/20" />
 
-          {/* Card Body */}
-          <div className="p-3 space-y-2.5">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-1.5">
-              <StatBox label="Name" value={turf.name} />
-              <StatBox label="Size" value={turf.size || "N/A"} />
-              <StatBox label="Cap" value={turf.player_capacity || "-"} />
+              {/* Display Order Badge */}
+              <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-md flex justify-center items-center border border-white/10">
+                <span className="text-white text-[10px] font-bold tracking-tight">
+                  #{turf.display_order}
+                </span>
+              </div>
+
+              {/* Sport Icon Badge */}
+              <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm p-1 rounded-md flex justify-center items-center shadow-sm border border-gray-100">
+                <img
+                  src={turf.icon_url}
+                  className="w-3.5 h-3.5 object-contain"
+                  alt="sport icon"
+                />
+              </div>
             </div>
 
-            {/* Fixed Description Container (UI Defended & Readable) */}
-            <div 
-              title={turf.description || "No description provided"} 
-              className="px-3 py-1.5 w-full text-blue-600 bg-blue-50/50 rounded-lg text-[11px] leading-relaxed text-left border border-blue-100 italic cursor-help line-clamp-2"
-            >
-              {turf.description || "No description provided"}
+            {/* Content Body Section */}
+            <div className="p-3.5 flex-1 flex flex-col justify-between min-w-0">
+              <div>
+                {/* Header Title Row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate" title={turf.name}>
+                      {turf.name}
+                    </h3>
+                    
+                    <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-gray-500 mt-0.5">
+                      <span className="bg-gray-100 px-1.5 py-0.5 rounded font-medium truncate max-w-[120px]">
+                        {turf.size || "Standard"}
+                      </span>
+                      <span className="text-gray-300">•</span>
+                      <span className="shrink-0">Cap: <strong className="text-gray-700 font-medium">{turf.player_capacity || "-"}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Drag Handle moved safely beside title section */}
+                  <div
+                    {...provided.dragHandleProps}
+                    className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-md cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 border border-gray-200 shrink-0 transition-colors"
+                  >
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+
+                {/* Description Block */}
+                <p 
+                  title={turf.description || "No description provided"} 
+                  className="text-xs text-gray-500 leading-relaxed line-clamp-2 mt-2"
+                >
+                  {turf.description || "No description provided."}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-2.5 mt-3 border-t border-gray-150 items-center">
+                <button
+                  onClick={() => onEdit(turf)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 active:scale-[0.98] transition-all shadow-sm"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">Edit</span>
+                </button>
+                <button
+                  onClick={() => onDelete(turf.id)}
+                  className="p-1.5 border border-gray-200 text-gray-400 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-100 active:scale-[0.95] transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-1.5 pt-0.5">
-              <button
-                onClick={() => onEdit(turf)}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
-              >
-                <Edit className="w-3.5 h-3.5" />
-                <span className="text-xs font-semibold">Edit</span>
-              </button>
-              <button
-                onClick={() => onDelete(turf.id)}
-                className="p-1.5 border border-red-100 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
           </div>
         </div>
       )}
     </Draggable>
-  );
-}
-
-// Cleaned up, bug-free StatBox component
-function StatBox({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="text-center p-1.5 rounded-md border border-blue-100 bg-blue-50/20 max-w-full overflow-hidden">
-      <p className="text-[9px] uppercase font-bold text-gray-400 tracking-wider">
-        {label}
-      </p>
-      <p className="text-xs font-bold text-blue-900 truncate mt-0.5">
-        {value}
-      </p>
-    </div>
   );
 }
